@@ -1,0 +1,216 @@
+{% extends "partials/base.html" %}
+{% block title %}{{ settings.hero_title }} - {{ settings.site_name }}{% endblock %}
+
+{% block content %}
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"><div class="hero-overlay"></div></div>
+  <div class="hero-content">
+    <h1 class="hero-title" data-aos="fade-up">{{ settings.hero_title }}</h1>
+    <p class="hero-subtitle" data-aos="fade-up" data-aos-delay="100">{{ settings.hero_subtitle }}</p>
+
+    <div class="search-box" data-aos="fade-up" data-aos-delay="200">
+      <form action="{{ url_for('properties') }}" method="GET" class="search-form">
+        <div class="search-tabs">
+          <button type="button" class="search-tab active" data-listing="sale" onclick="setSearchTab(this,'sale')">Buy</button>
+          <button type="button" class="search-tab" data-listing="rent" onclick="setSearchTab(this,'rent')">Rent</button>
+        </div>
+        <input type="hidden" name="listing" id="listingType" value="sale">
+        <div class="search-inputs">
+          <div class="search-field">
+            <i class="fas fa-search"></i>
+            <input type="text" name="q" placeholder="Search city, locality, project...">
+          </div>
+          <div class="search-field">
+            <i class="fas fa-home"></i>
+            <select name="type">
+              <option value="">Property Type</option>
+              {% for pt in prop_types %}<option value="{{ pt }}">{{ pt }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="search-field">
+            <i class="fas fa-bed"></i>
+            <select name="bedrooms">
+              <option value="">Bedrooms</option>
+              <option value="1">1+</option><option value="2">2+</option><option value="3">3+</option><option value="4">4+</option>
+            </select>
+          </div>
+          <button type="submit" class="search-btn">Search <i class="fas fa-arrow-right"></i></button>
+        </div>
+      </form>
+    </div>
+
+    <div class="hero-stats" data-aos="fade-up" data-aos-delay="300">
+      <div class="stat-item"><span class="stat-num">500+</span><span class="stat-label">Properties</span></div>
+      <div class="stat-item"><span class="stat-num">10+</span><span class="stat-label">Years Exp.</span></div>
+      <div class="stat-item"><span class="stat-num">1000+</span><span class="stat-label">Happy Clients</span></div>
+    </div>
+  </div>
+  <div class="hero-scroll"><span>Scroll</span><i class="fas fa-chevron-down"></i></div>
+</section>
+
+<!-- CATEGORIES -->
+<section class="section categories-section">
+  <div class="container">
+    <div class="section-header" data-aos="fade-up">
+      <span class="section-eyebrow">Browse By Type</span>
+      <h2 class="section-title">Property Categories</h2>
+    </div>
+    <div class="categories-grid">
+      {% for name, icon, desc in [('Apartment','fas fa-building','City apartments'),('Villa','fas fa-home','Luxury villas'),('Office','fas fa-briefcase','Office spaces'),('Shop','fas fa-store','Retail shops'),('Land','fas fa-map','Plots & land'),('Warehouse','fas fa-warehouse','Industrial')] %}
+      <a href="{{ url_for('properties') }}?type={{ name }}" class="category-card" data-aos="fade-up" data-aos-delay="{{ loop.index0 * 60 }}">
+        <div class="cat-icon"><i class="{{ icon }}"></i></div>
+        <h3 class="cat-name">{{ name }}</h3>
+        <p class="cat-desc">{{ desc }}</p>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- FEATURED -->
+{% if featured %}
+<section class="section featured-section">
+  <div class="container">
+    <div class="section-header has-link" data-aos="fade-up">
+      <div><span class="section-eyebrow">Hand-Picked</span><h2 class="section-title">Featured Properties</h2></div>
+      <a href="{{ url_for('properties') }}" class="section-link">View All <i class="fas fa-arrow-right"></i></a>
+    </div>
+    <div class="properties-grid">{% for prop in featured %}{% include "partials/property_card.html" %}{% endfor %}</div>
+  </div>
+</section>
+{% endif %}
+
+<!-- LATEST -->
+{% if latest %}
+<section class="section latest-section" style="background:var(--gray-light)">
+  <div class="container">
+    <div class="section-header has-link" data-aos="fade-up">
+      <div><span class="section-eyebrow">New Listings</span><h2 class="section-title">Latest Properties</h2></div>
+      <a href="{{ url_for('properties') }}" class="section-link">View All <i class="fas fa-arrow-right"></i></a>
+    </div>
+    <div class="properties-grid">{% for prop in latest %}{% include "partials/property_card.html" %}{% endfor %}</div>
+  </div>
+</section>
+{% endif %}
+
+<!-- AGENT -->
+<section class="section agent-section">
+  <div class="container">
+    <div class="agent-content">
+      <div class="agent-image-wrap" data-aos="fade-right">
+        {% if settings.agent_photo %}
+          <img src="{{ url_for('static', filename='uploads/profiles/' + settings.agent_photo) }}" alt="{{ settings.agent_name }}" class="agent-photo">
+        {% else %}
+          <div class="agent-photo-placeholder"><i class="fas fa-user"></i></div>
+        {% endif %}
+        <div class="agent-badge"><i class="fas fa-certificate"></i><span>Verified Agent</span></div>
+      </div>
+      <div class="agent-info" data-aos="fade-left">
+        <span class="section-eyebrow">Meet Your Agent</span>
+        <h2>{{ settings.agent_name }}</h2>
+        <p class="agent-title-text">{{ settings.agent_title }}</p>
+        <p class="agent-bio">{{ settings.agent_bio }}</p>
+        <div class="agent-stats">
+          <div><strong>{{ settings.agent_experience }}</strong><span>Experience</span></div>
+          <div><strong>500+</strong><span>Sold</span></div>
+          <div><strong>1000+</strong><span>Clients</span></div>
+        </div>
+        <div class="agent-langs"><i class="fas fa-language"></i> {{ settings.agent_languages }}</div>
+        <div class="agent-actions">
+          <a href="https://wa.me/{{ settings.agent_whatsapp or settings.whatsapp }}" target="_blank" class="btn btn-whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+          <a href="{{ url_for('about') }}" class="btn btn-outline-dark">View Profile</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+{% if testimonials %}
+<section class="section testimonials-section">
+  <div class="container">
+    <div class="section-header" data-aos="fade-up">
+      <span class="section-eyebrow" style="color:var(--accent)">What Clients Say</span>
+      <h2 class="section-title" style="color:white">Testimonials</h2>
+    </div>
+    <div class="testimonials-grid">
+      {% for t in testimonials %}
+      <div class="testimonial-card" data-aos="fade-up" data-aos-delay="{{ loop.index0 * 80 }}">
+        <div class="stars">{% for i in range(t.rating) %}<i class="fas fa-star"></i>{% endfor %}</div>
+        <p class="testimonial-text">"{{ t.content }}"</p>
+        <div class="testimonial-author">
+          {% if t.photo %}<img src="{{ url_for('static', filename='uploads/profiles/' + t.photo) }}" alt="{{ t.name }}" class="author-photo">
+          {% else %}<div class="author-photo-placeholder"><i class="fas fa-user"></i></div>{% endif %}
+          <div><strong>{{ t.name }}</strong>{% if t.designation %}<span>{{ t.designation }}</span>{% endif %}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- FAQ -->
+{% if faqs %}
+<section class="section faq-section">
+  <div class="container">
+    <div class="section-header" data-aos="fade-up">
+      <span class="section-eyebrow">Got Questions?</span>
+      <h2 class="section-title">Frequently Asked</h2>
+    </div>
+    <div class="faq-list" data-aos="fade-up">
+      {% for faq in faqs %}
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          {{ faq.question }}<i class="fas fa-chevron-down faq-icon"></i>
+        </button>
+        <div class="faq-answer"><p>{{ faq.answer }}</p></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- CTA -->
+<section class="section cta-section">
+  <div class="container">
+    <div class="cta-box" data-aos="fade-up">
+      <h2>Ready to Find Your Dream Property?</h2>
+      <p>Our experts are here to guide you every step of the way.</p>
+      <div class="cta-buttons">
+        <a href="{{ url_for('contact') }}" class="btn btn-primary">Get In Touch</a>
+        <a href="https://wa.me/{{ settings.whatsapp }}" target="_blank" class="btn btn-whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+        <a href="tel:{{ settings.phone }}" class="btn" style="background:white;color:var(--primary)"><i class="fas fa-phone"></i> Call Now</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MAP (OpenStreetMap) -->
+<section class="map-section">
+  <div id="homeMap" style="height:420px;width:100%;"></div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+function setSearchTab(btn, type) {
+  document.querySelectorAll('.search-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('listingType').value = type;
+}
+// Home Map
+const lat = parseFloat("{{ settings.map_lat or '19.0760' }}");
+const lng = parseFloat("{{ settings.map_lng or '72.8777' }}");
+const map = L.map('homeMap').setView([lat, lng], parseInt("{{ settings.map_zoom or '13' }}"));
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+}).addTo(map);
+L.marker([lat, lng]).addTo(map)
+  .bindPopup('<strong>{{ settings.site_name }}</strong><br>{{ settings.address }}<br><a href="{{ url_for("contact") }}">Get Directions</a>').openPopup();
+</script>
+{% endblock %}

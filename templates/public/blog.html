@@ -1,0 +1,42 @@
+{% extends "partials/base.html" %}
+{% block title %}Blog - {{ settings.site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero">
+  <div class="container">
+    <h1>Blog & Insights</h1>
+    <p>Real estate news, tips, and market updates</p>
+  </div>
+</section>
+<section class="section">
+  <div class="container">
+    {% if posts.items %}
+    <div class="blog-grid">
+      {% for post in posts.items %}
+      <article class="blog-card" data-aos="fade-up">
+        {% if post.featured_image %}
+          <img src="{{ url_for('static', filename='uploads/blog/' + post.featured_image) }}" alt="{{ post.title }}" class="blog-img">
+        {% else %}
+          <div class="blog-img-placeholder"></div>
+        {% endif %}
+        <div class="blog-body">
+          <span class="blog-date"><i class="fas fa-calendar"></i> {{ post.created_at.strftime('%B %d, %Y') }}</span>
+          <h3 class="blog-title"><a href="{{ url_for('blog_detail', slug=post.slug) }}">{{ post.title }}</a></h3>
+          {% if post.excerpt %}<p class="blog-excerpt">{{ post.excerpt }}</p>{% endif %}
+          <a href="{{ url_for('blog_detail', slug=post.slug) }}" class="blog-read-more">Read More <i class="fas fa-arrow-right"></i></a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% if posts.pages > 1 %}
+    <div class="pagination">
+      {% if posts.has_prev %}<a href="{{ url_for('blog', page=posts.prev_num) }}" class="page-btn"><i class="fas fa-chevron-left"></i></a>{% endif %}
+      {% for p in posts.iter_pages() %}{% if p %}<a href="{{ url_for('blog', page=p) }}" class="page-btn {% if p == posts.page %}active{% endif %}">{{ p }}</a>{% endif %}{% endfor %}
+      {% if posts.has_next %}<a href="{{ url_for('blog', page=posts.next_num) }}" class="page-btn"><i class="fas fa-chevron-right"></i></a>{% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="empty-state"><i class="fas fa-blog"></i><h3>No posts yet</h3><p>Check back soon for updates.</p></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

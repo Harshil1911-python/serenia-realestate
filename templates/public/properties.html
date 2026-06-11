@@ -1,0 +1,141 @@
+{% extends "partials/base.html" %}
+{% block title %}Properties - {{ settings.site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero">
+  <div class="container"><h1>Properties</h1><p>Browse our collection</p></div>
+</section>
+
+<section class="properties-page">
+  <div class="container">
+    <!-- Filters -->
+    <div class="filters-bar">
+      <form method="GET" action="{{ url_for('properties') }}" class="filters-form" id="filterForm">
+        <div class="filter-group"><input type="text" name="q" value="{{ request.args.get('q','') }}" placeholder="Search location, title..." class="filter-input"></div>
+        <div class="filter-group">
+          <select name="type" class="filter-select" onchange="this.form.submit()">
+            <option value="">All Types</option>
+            {% for pt in prop_types %}<option value="{{ pt }}" {% if request.args.get('type')==pt %}selected{% endif %}>{{ pt }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="filter-group">
+          <select name="listing" class="filter-select" onchange="this.form.submit()">
+            <option value="">Buy & Rent</option>
+            <option value="sale" {% if request.args.get('listing')=='sale' %}selected{% endif %}>For Sale</option>
+            <option value="rent" {% if request.args.get('listing')=='rent' %}selected{% endif %}>For Rent</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <select name="city" class="filter-select" onchange="this.form.submit()">
+            <option value="">All Cities</option>
+            {% for city in cities %}<option value="{{ city }}" {% if request.args.get('city')==city %}selected{% endif %}>{{ city }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="filter-group">
+          <select name="bedrooms" class="filter-select" onchange="this.form.submit()">
+            <option value="">Beds</option>
+            {% for b in [1,2,3,4] %}<option value="{{ b }}" {% if request.args.get('bedrooms')==b|string %}selected{% endif %}>{{ b }}+</option>{% endfor %}
+          </select>
+        </div>
+        <div class="filter-group filter-price">
+          <input type="number" name="min_price" value="{{ request.args.get('min_price','') }}" placeholder="Min ₹" class="filter-input">
+          <input type="number" name="max_price" value="{{ request.args.get('max_price','') }}" placeholder="Max ₹" class="filter-input">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+        <a href="{{ url_for('properties') }}" class="btn btn-outline btn-sm">Clear</a>
+        <button type="button" class="btn btn-outline btn-sm" onclick="toggleMapView()" id="mapToggleBtn">
+          <i class="fas fa-map"></i> Map View
+        </button>
+      </form>
+    </div>
+
+    <div class="results-header">
+      <p class="results-count"><strong>{{ props.total }}</strong> Properties Found</p>
+    </div>
+
+    <!-- Map View (OpenStreetMap) -->
+    <div id="mapView" style="display:none; margin-bottom:2rem;">
+      <div id="propMap" style="height:500px; border-radius:12px; overflow:hidden;"></div>
+    </div>
+
+    <!-- Grid View -->
+    {% if props.items %}
+    <div class="properties-grid properties-grid-3" id="gridView">
+      {% for prop in props.items %}{% include "partials/property_card.html" %}{% endfor %}
+    </div>
+    {% if props.pages > 1 %}
+    <div class="pagination">
+      {% if props.has_prev %}<a href="{{ url_for('properties', page=props.prev_num, **request.args) }}" class="page-btn"><i class="fas fa-chevron-left"></i></a>{% endif %}
+      {% for p in props.iter_pages() %}{% if p %}<a href="{{ url_for('properties', page=p, **request.args) }}" class="page-btn {% if p==props.page %}active{% endif %}">{{ p }}</a>{% else %}<span class="page-dots">…</span>{% endif %}{% endfor %}
+      {% if props.has_next %}<a href="{{ url_for('properties', page=props.next_num, **request.args) }}" class="page-btn"><i class="fas fa-chevron-right"></i></a>{% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="empty-state"><i class="fas fa-search"></i><h3>No Properties Found</h3><p><a href="{{ url_for('properties') }}">Clear filters</a></p></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const geoData = {{ geo_data|safe }};
+let map = null, mapInitialized = false;
+
+function toggleMapView() {
+  const mv = document.getElementById('mapView');
+  const gv = document.getElementById('gridView');
+  const btn = document.getElementById('mapToggleBtn');
+  if (mv.style.display === 'none') {
+    mv.style.display = 'block';
+    btn.innerHTML = '<i class="fas fa-th"></i> Grid View';
+    if (!mapInitialized) initMap();
+  } else {
+    mv.style.display = 'none';
+    btn.innerHTML = '<i class="fas fa-map"></i> Map View';
+  }
+}
+
+function initMap() {
+  const defaultLat = {{ settings.map_lat or '19.0760' }};
+  const defaultLng = {{ settings.map_lng or '72.8777' }};
+  map = L.map('propMap').setView([defaultLat, defaultLng], {{ settings.map_zoom or 11 }});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+  }).addTo(map);
+
+  const statusColors = {available:'#22c55e',sold:'#ef4444',rented:'#f59e0b',under_negotiation:'#8b5cf6'};
+
+  geoData.forEach(p => {
+    const color = statusColors[p.status] || '#1a56db';
+    const icon = L.divIcon({
+      html: `<div style="background:${color};color:white;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3)">₹${formatPrice(p.price)}</div>`,
+      className:'', iconAnchor:[0,0]
+    });
+    const marker = L.marker([p.lat, p.lng], {icon}).addTo(map);
+    marker.bindPopup(`
+      <div style="width:200px">
+        ${p.img ? `<img src="${p.img}" style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-bottom:8px">` : ''}
+        <strong style="font-size:13px">${p.title}</strong>
+        <div style="color:#1a56db;font-weight:700;margin:4px 0">₹${formatPrice(p.price)}</div>
+        <div style="font-size:12px;color:#64748b">${p.type} · ${p.status}</div>
+        <a href="${p.url}" style="display:block;margin-top:8px;background:#1a56db;color:white;padding:6px;border-radius:6px;text-align:center;font-size:12px;font-weight:600;">View Details</a>
+      </div>
+    `);
+  });
+
+  if (geoData.length > 0) {
+    const group = L.featureGroup(geoData.map(p => L.marker([p.lat, p.lng])));
+    map.fitBounds(group.getBounds().pad(0.1));
+  }
+  mapInitialized = true;
+}
+
+function formatPrice(p) {
+  if (p >= 10000000) return (p/10000000).toFixed(1) + 'Cr';
+  if (p >= 100000) return (p/100000).toFixed(1) + 'L';
+  return p.toLocaleString('en-IN');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}Blog Posts{% endblock %}
+{% block page_title %}Blog Posts{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3>Blog Posts ({{ posts|length }})</h3>
+    <a href="{{ url_for('add_blog') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Post</a>
+  </div>
+  <div class="card-body">
+    {% if posts %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for post in posts %}
+          <tr>
+            <td><strong>{{ post.title[:50] }}</strong></td>
+            <td><span class="badge {% if post.is_published %}badge-published{% else %}badge-draft{% endif %}">{{ 'Published' if post.is_published else 'Draft' }}</span></td>
+            <td>{{ post.views }}</td>
+            <td>{{ post.created_at.strftime('%d %b %Y') }}</td>
+            <td>
+              <div class="action-buttons">
+                {% if post.is_published %}
+                <a href="{{ url_for('blog_detail', slug=post.slug) }}" target="_blank" class="btn btn-xs btn-outline"><i class="fas fa-eye"></i></a>
+                {% endif %}
+                <a href="{{ url_for('edit_blog', bid=post.id) }}" class="btn btn-xs btn-primary"><i class="fas fa-edit"></i></a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><i class="fas fa-blog"></i><h3>No Blog Posts</h3><a href="{{ url_for('add_blog') }}" class="btn btn-primary">Write First Post</a></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

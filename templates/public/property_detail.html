@@ -1,0 +1,234 @@
+{% extends "partials/base.html" %}
+{% block title %}{{ prop.title }} - {{ settings.site_name }}{% endblock %}
+{% block meta_description %}{{ prop.meta_description or prop.description[:160] if prop.description else '' }}{% endblock %}
+
+{% block content %}
+<section class="page-hero page-hero-sm">
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="{{ url_for('index') }}">Home</a> /
+      <a href="{{ url_for('properties') }}">Properties</a> /
+      <span>{{ prop.title }}</span>
+    </div>
+  </div>
+</section>
+
+<section class="property-detail-section">
+  <div class="container">
+    <div class="property-detail-layout">
+      <!-- LEFT -->
+      <div class="prop-detail-main">
+
+        <!-- Gallery -->
+        <div class="section-card">
+          {% if prop.images %}
+          <div class="gallery-main" id="galleryMain">
+            <img src="{{ url_for('static', filename='uploads/properties/' + prop.images[0].filename) }}" alt="{{ prop.title }}" id="mainGalleryImg">
+          </div>
+          {% if prop.images|length > 1 %}
+          <div class="gallery-thumbs">
+            {% for img in prop.images %}
+            <img src="{{ url_for('static', filename='uploads/properties/' + img.filename) }}"
+                 alt="{{ prop.title }}" class="gallery-thumb {% if loop.first %}active{% endif %}"
+                 onclick="changeImg(this, '{{ url_for('static', filename='uploads/properties/' + img.filename) }}')">
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% else %}
+          <div class="gallery-placeholder"><i class="fas fa-image"></i><p>No Images Available</p></div>
+          {% endif %}
+        </div>
+
+        <!-- Video -->
+        {% if prop.video_url %}
+        <div class="section-card">
+          <h3>Property Video</h3>
+          <div class="video-wrap">
+            <iframe src="{{ prop.video_url }}" frameborder="0" allowfullscreen loading="lazy"></iframe>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Description -->
+        <div class="section-card">
+          <h3>About This Property</h3>
+          <div class="prop-description">{{ prop.description|safe if prop.description else 'No description available.' }}</div>
+        </div>
+
+        <!-- Specs -->
+        <div class="section-card">
+          <h3>Property Details</h3>
+          <div class="specs-grid">
+            <div class="spec-item"><i class="fas fa-tag"></i><div><span>Property ID</span><strong>{{ prop.property_id }}</strong></div></div>
+            <div class="spec-item"><i class="fas fa-home"></i><div><span>Type</span><strong>{{ prop.property_type }}</strong></div></div>
+            {% if prop.area %}<div class="spec-item"><i class="fas fa-ruler-combined"></i><div><span>Area</span><strong>{{ prop.area|int }} {{ prop.area_unit }}</strong></div></div>{% endif %}
+            {% if prop.bedrooms %}<div class="spec-item"><i class="fas fa-bed"></i><div><span>Bedrooms</span><strong>{{ prop.bedrooms }}</strong></div></div>{% endif %}
+            {% if prop.bathrooms %}<div class="spec-item"><i class="fas fa-bath"></i><div><span>Bathrooms</span><strong>{{ prop.bathrooms }}</strong></div></div>{% endif %}
+            {% if prop.parking %}<div class="spec-item"><i class="fas fa-car"></i><div><span>Parking</span><strong>{{ prop.parking }}</strong></div></div>{% endif %}
+            {% if prop.furnishing %}<div class="spec-item"><i class="fas fa-couch"></i><div><span>Furnishing</span><strong>{{ prop.furnishing|title }}</strong></div></div>{% endif %}
+            {% if prop.property_age %}<div class="spec-item"><i class="fas fa-calendar-alt"></i><div><span>Property Age</span><strong>{{ prop.property_age }}</strong></div></div>{% endif %}
+            <div class="spec-item"><i class="fas fa-circle"></i><div><span>Status</span><strong><span class="status-pill status-{{ prop.status }}">{{ prop.status|replace('_',' ')|title }}</span></strong></div></div>
+            {% if prop.pincode %}<div class="spec-item"><i class="fas fa-map-pin"></i><div><span>Pincode</span><strong>{{ prop.pincode }}</strong></div></div>{% endif %}
+          </div>
+        </div>
+
+        <!-- Amenities -->
+        {% if prop.amenities %}
+        <div class="section-card">
+          <h3>Amenities & Features</h3>
+          <div class="amenities-grid">
+            {% for a in prop.amenities %}
+            <span class="amenity-tag"><i class="fas fa-check-circle"></i> {{ a.name }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Map (Leaflet) -->
+        {% if prop.latitude and prop.longitude %}
+        <div class="section-card">
+          <h3>Location on Map</h3>
+          <div id="propDetailMap" style="height:340px;border-radius:12px;overflow:hidden;"></div>
+        </div>
+        {% elif prop.google_map_link %}
+        <div class="section-card">
+          <h3>Location</h3>
+          <div class="map-embed">{{ prop.google_map_link|safe }}</div>
+        </div>
+        {% endif %}
+
+        <!-- Similar -->
+        {% if similar %}
+        <div class="section-card">
+          <h3>Similar Properties</h3>
+          <div class="similar-grid">
+            {% for sp in similar %}
+            <a href="{{ url_for('property_detail', slug=sp.slug) }}" class="similar-card">
+              {% if sp.images %}
+                <img src="{{ url_for('static', filename='uploads/properties/' + sp.images[0].filename) }}" alt="{{ sp.title }}" loading="lazy">
+              {% else %}
+                <div class="similar-img-placeholder"><i class="fas fa-home"></i></div>
+              {% endif %}
+              <div class="similar-info">
+                <p>{{ sp.title[:40] }}</p>
+                <span>
+                  {% if sp.price >= 10000000 %}₹{{ "%.1f"|format(sp.price/10000000) }}Cr
+                  {% elif sp.price >= 100000 %}₹{{ "%.1f"|format(sp.price/100000) }}L
+                  {% else %}₹{{ "{:,.0f}".format(sp.price) }}{% endif %}
+                </span>
+              </div>
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- RIGHT SIDEBAR -->
+      <div class="prop-detail-sidebar">
+        <!-- Price -->
+        <div class="price-card">
+          <div class="price-header">
+            <div>
+              <p class="price-amount">
+                {% if prop.price >= 10000000 %}₹{{ "%.2f"|format(prop.price/10000000) }} Cr
+                {% elif prop.price >= 100000 %}₹{{ "%.2f"|format(prop.price/100000) }} L
+                {% else %}₹{{ "{:,.0f}".format(prop.price) }}{% endif %}
+              </p>
+              <p class="price-unit">{{ prop.listing_type|title }} · {{ prop.property_type }}</p>
+            </div>
+            <span class="status-pill status-{{ prop.status }}">{{ prop.status|replace('_',' ')|title }}</span>
+          </div>
+          <div class="price-meta">
+            <span><i class="fas fa-map-marker-alt"></i> {{ prop.city }}{% if prop.state %}, {{ prop.state }}{% endif %}</span>
+            <span><i class="fas fa-eye"></i> {{ prop.views }} views</span>
+          </div>
+          <div class="contact-actions">
+            <a href="tel:{{ settings.phone }}" class="btn btn-primary btn-block"><i class="fas fa-phone"></i> Call Agent</a>
+            <a href="https://wa.me/{{ settings.whatsapp }}?text=Hi, I'm interested in {{ prop.title }} (ID: {{ prop.property_id }})" target="_blank" class="btn btn-whatsapp btn-block"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+            {% if prop.brochure_path %}
+            <a href="{{ url_for('static', filename='uploads/documents/' + prop.brochure_path) }}" download class="btn btn-outline btn-block"><i class="fas fa-file-pdf"></i> Download Brochure</a>
+            {% endif %}
+          </div>
+          <div class="share-section">
+            <p>Share:</p>
+            <div class="share-buttons">
+              <a href="https://wa.me/?text=Check out {{ prop.title }}: {{ request.url }}" target="_blank" class="share-btn" style="background:#25d366"><i class="fab fa-whatsapp"></i></a>
+              <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.url }}" target="_blank" class="share-btn" style="background:#1877f2"><i class="fab fa-facebook-f"></i></a>
+              <a href="https://twitter.com/intent/tweet?url={{ request.url }}&text={{ prop.title }}" target="_blank" class="share-btn" style="background:#1da1f2"><i class="fab fa-twitter"></i></a>
+              <button onclick="navigator.clipboard.writeText(window.location.href).then(()=>alert('Link copied!'))" class="share-btn" style="background:#64748b"><i class="fas fa-copy"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inquiry Form -->
+        <div class="inquiry-card">
+          <h3><i class="fas fa-envelope" style="color:var(--primary)"></i> Send Inquiry</h3>
+          <form id="inquiryForm" onsubmit="submitInquiry(event, {{ prop.id }})">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="name" placeholder="Your Name *" required class="form-input">
+            <input type="email" name="email" placeholder="Email Address *" required class="form-input">
+            <input type="tel" name="phone" placeholder="Phone Number" class="form-input">
+            <textarea name="message" rows="3" required class="form-input" placeholder="I'm interested in this property...">I am interested in {{ prop.title }} (ID: {{ prop.property_id }}). Please contact me.</textarea>
+            <button type="submit" class="btn btn-primary btn-block" id="inquirySubmitBtn">
+              <i class="fas fa-paper-plane"></i> Send Inquiry
+            </button>
+          </form>
+          <div id="inquiryMsg" style="display:none;margin-top:.75rem;padding:.75rem;border-radius:8px;font-size:.875rem;font-weight:500;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Gallery
+function changeImg(thumb, src) {
+  document.getElementById('mainGalleryImg').src = src;
+  document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
+  thumb.classList.add('active');
+}
+
+// Inquiry
+async function submitInquiry(e, propId) {
+  e.preventDefault();
+  const btn = document.getElementById('inquirySubmitBtn');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+  const form = e.target;
+  const data = new FormData(form);
+  data.append('property_id', propId);
+  try {
+    const res = await fetch('/inquiry', { method: 'POST', body: data });
+    const json = await res.json();
+    const msg = document.getElementById('inquiryMsg');
+    msg.style.display = 'block';
+    msg.style.background = json.success ? '#dcfce7' : '#fee2e2';
+    msg.style.color = json.success ? '#166534' : '#991b1b';
+    msg.innerHTML = (json.success ? '✅ ' : '❌ ') + json.message;
+    if (json.success) form.reset();
+  } catch(err) {
+    alert('Error submitting. Please try again.');
+  }
+  btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Inquiry';
+}
+
+// Leaflet map
+{% if prop.latitude and prop.longitude %}
+const map = L.map('propDetailMap').setView([{{ prop.latitude }}, {{ prop.longitude }}], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+}).addTo(map);
+L.marker([{{ prop.latitude }}, {{ prop.longitude }}]).addTo(map)
+  .bindPopup('<strong>{{ prop.title }}</strong><br>{{ prop.address or prop.city }}').openPopup();
+// Add circle for area
+L.circle([{{ prop.latitude }}, {{ prop.longitude }}], {
+  color: 'var(--primary, #1a56db)', fillColor: 'var(--primary, #1a56db)',
+  fillOpacity: 0.1, radius: 500
+}).addTo(map);
+{% endif %}
+</script>
+{% endblock %}

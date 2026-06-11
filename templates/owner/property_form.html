@@ -1,0 +1,287 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}{{ action }} Property{% endblock %}
+{% block page_title %}{{ action }} Property{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3>{{ action }} Property</h3>
+    <a href="{{ url_for('owner_properties') }}" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back</a>
+  </div>
+  <div class="card-body">
+    <form method="POST" enctype="multipart/form-data" class="property-form" id="propertyForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <!-- Basic Info -->
+      <div class="form-section">
+        <h4 class="form-section-title">Basic Information</h4>
+        <div class="form-grid">
+          <div class="form-group form-col-2">
+            <label>Property Title *</label>
+            <input type="text" name="title" required class="form-input" value="{{ prop.title if prop else '' }}" placeholder="Beautiful 3BHK Apartment in Juhu">
+          </div>
+          <div class="form-group">
+            <label>Property Type *</label>
+            <select name="property_type" required class="form-input">
+              {% for pt in prop_types %}
+              <option value="{{ pt }}" {% if prop and prop.property_type == pt %}selected{% endif %}>{{ pt }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Listing Type *</label>
+            <select name="listing_type" required class="form-input">
+              <option value="sale" {% if not prop or prop.listing_type == 'sale' %}selected{% endif %}>For Sale</option>
+              <option value="rent" {% if prop and prop.listing_type == 'rent' %}selected{% endif %}>For Rent</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select name="status" class="form-input">
+              {% for s in ['available','sold','rented','under_negotiation'] %}
+              <option value="{{ s }}" {% if prop and prop.status == s %}selected{% endif %}>{{ s|replace('_',' ')|title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pricing -->
+      <div class="form-section">
+        <h4 class="form-section-title">Pricing & Size</h4>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Price (₹) *</label>
+            <input type="number" name="price" required class="form-input" value="{{ prop.price if prop else '' }}" placeholder="5000000">
+          </div>
+          <div class="form-group">
+            <label>Price Unit</label>
+            <select name="price_unit" class="form-input">
+              <option value="total" {% if not prop or prop.price_unit == 'total' %}selected{% endif %}>Total Price</option>
+              <option value="per_sqft" {% if prop and prop.price_unit == 'per_sqft' %}selected{% endif %}>Per Sqft</option>
+              <option value="per_month" {% if prop and prop.price_unit == 'per_month' %}selected{% endif %}>Per Month</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Area</label>
+            <input type="number" name="area" class="form-input" value="{{ prop.area if prop else '' }}" placeholder="1200">
+          </div>
+          <div class="form-group">
+            <label>Area Unit</label>
+            <select name="area_unit" class="form-input">
+              <option value="sqft" {% if not prop or prop.area_unit == 'sqft' %}selected{% endif %}>sq.ft</option>
+              <option value="sqm" {% if prop and prop.area_unit == 'sqm' %}selected{% endif %}>sq.m</option>
+              <option value="acre" {% if prop and prop.area_unit == 'acre' %}selected{% endif %}>Acre</option>
+              <option value="gunta" {% if prop and prop.area_unit == 'gunta' %}selected{% endif %}>Gunta</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Specifications -->
+      <div class="form-section">
+        <h4 class="form-section-title">Specifications</h4>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Bedrooms</label>
+            <input type="number" name="bedrooms" class="form-input" value="{{ prop.bedrooms if prop and prop.bedrooms else '' }}" min="0" placeholder="3">
+          </div>
+          <div class="form-group">
+            <label>Bathrooms</label>
+            <input type="number" name="bathrooms" class="form-input" value="{{ prop.bathrooms if prop and prop.bathrooms else '' }}" min="0" placeholder="2">
+          </div>
+          <div class="form-group">
+            <label>Parking Spots</label>
+            <input type="number" name="parking" class="form-input" value="{{ prop.parking if prop and prop.parking else '' }}" min="0" placeholder="1">
+          </div>
+          <div class="form-group">
+            <label>Furnishing Status</label>
+            <select name="furnishing" class="form-input">
+              <option value="">Select...</option>
+              <option value="furnished" {% if prop and prop.furnishing == 'furnished' %}selected{% endif %}>Furnished</option>
+              <option value="semi-furnished" {% if prop and prop.furnishing == 'semi-furnished' %}selected{% endif %}>Semi-Furnished</option>
+              <option value="unfurnished" {% if prop and prop.furnishing == 'unfurnished' %}selected{% endif %}>Unfurnished</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Property Age</label>
+            <input type="text" name="property_age" class="form-input" value="{{ prop.property_age if prop else '' }}" placeholder="New / 2 Years / 5+ Years">
+          </div>
+        </div>
+      </div>
+
+      <!-- Location -->
+      <div class="form-section">
+        <h4 class="form-section-title">Location</h4>
+        <div class="form-grid">
+          <div class="form-group form-col-2">
+            <label>Full Address</label>
+            <input type="text" name="address" class="form-input" value="{{ prop.address if prop else '' }}" placeholder="Flat 301, Sunshine Apartments, Park Street">
+          </div>
+          <div class="form-group">
+            <label>City</label>
+            <input type="text" name="city" class="form-input" value="{{ prop.city if prop else '' }}" placeholder="Mumbai">
+          </div>
+          <div class="form-group">
+            <label>State</label>
+            <input type="text" name="state" class="form-input" value="{{ prop.state if prop else '' }}" placeholder="Maharashtra">
+          </div>
+          <div class="form-group">
+            <label>Pincode</label>
+            <input type="text" name="pincode" class="form-input" value="{{ prop.pincode if prop else '' }}" placeholder="400001">
+          </div>
+          <div class="form-group">
+            <label>Google Maps Embed Code</label>
+            <textarea name="google_map_link" class="form-input" rows="3" placeholder="Paste Google Maps embed iframe code here">{{ prop.google_map_link if prop else '' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="form-section">
+        <h4 class="form-section-title">Description</h4>
+        <div class="form-group">
+          <textarea name="description" class="form-input" rows="6" placeholder="Describe the property in detail...">{{ prop.description if prop else '' }}</textarea>
+        </div>
+      </div>
+
+      <!-- Media -->
+      <div class="form-section">
+        <h4 class="form-section-title">Media</h4>
+        <div class="form-grid">
+          <div class="form-group form-col-2">
+            <label>Property Images (JPG, PNG, WEBP)</label>
+            <div class="upload-zone" id="uploadZone">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <p>Drag & drop or click to upload images</p>
+              <input type="file" name="images[]" multiple accept="image/*" id="imageInput" class="file-input-hidden">
+            </div>
+            <div id="imagePreview" class="image-preview-grid">
+              {% if prop %}
+                {% for img in prop.images %}
+                <div class="img-preview-item" data-img-id="{{ img.id }}">
+                  <img src="{{ url_for('static', filename='uploads/properties/' + img.filename) }}" alt="">
+                  <button type="button" class="img-delete-btn" onclick="deleteImage({{ img.id }}, this)"><i class="fas fa-times"></i></button>
+                </div>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Video URL (YouTube/Vimeo embed)</label>
+            <input type="url" name="video_url" class="form-input" value="{{ prop.video_url if prop else '' }}" placeholder="https://www.youtube.com/embed/...">
+          </div>
+          <div class="form-group">
+            <label>Brochure (PDF/DOCX)</label>
+            <input type="file" name="brochure" accept=".pdf,.docx" class="form-input">
+          </div>
+        </div>
+      </div>
+
+      <!-- Amenities -->
+      <div class="form-section">
+        <h4 class="form-section-title">Amenities</h4>
+        <div class="amenities-builder" id="amenitiesBuilder">
+          {% if prop and prop.amenities %}
+            {% for amenity in prop.amenities %}
+            <div class="amenity-input-row">
+              <input type="text" name="amenities[]" value="{{ amenity.name }}" class="form-input" placeholder="e.g. Swimming Pool">
+              <button type="button" class="btn btn-xs btn-danger" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+            </div>
+            {% endfor %}
+          {% else %}
+            {% for a in ['Swimming Pool', 'Gym', 'Security', 'Power Backup', 'Lift'] %}
+            <div class="amenity-input-row">
+              <input type="text" name="amenities[]" value="{{ a }}" class="form-input">
+              <button type="button" class="btn btn-xs btn-danger" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+            </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addAmenity()"><i class="fas fa-plus"></i> Add Amenity</button>
+      </div>
+
+      <!-- SEO -->
+      <div class="form-section">
+        <h4 class="form-section-title">SEO Settings</h4>
+        <div class="form-group">
+          <label>Meta Title</label>
+          <input type="text" name="meta_title" class="form-input" value="{{ prop.meta_title if prop else '' }}" placeholder="SEO Title for this property">
+        </div>
+        <div class="form-group">
+          <label>Meta Description</label>
+          <textarea name="meta_description" class="form-input" rows="2" placeholder="SEO description...">{{ prop.meta_description if prop else '' }}</textarea>
+        </div>
+      </div>
+
+      <!-- Options -->
+      <div class="form-section">
+        <label class="checkbox-label">
+          <input type="checkbox" name="is_featured" {% if prop and prop.is_featured %}checked{% endif %}>
+          <span>Mark as Featured Property</span>
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-save"></i> {{ action }} Property
+        </button>
+        <a href="{{ url_for('owner_properties') }}" class="btn btn-outline">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Image upload zone
+const uploadZone = document.getElementById('uploadZone');
+const imageInput = document.getElementById('imageInput');
+const preview = document.getElementById('imagePreview');
+
+uploadZone.addEventListener('click', () => imageInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  const dt = new DataTransfer();
+  [...e.dataTransfer.files].forEach(f => dt.items.add(f));
+  imageInput.files = dt.files;
+  showPreviews(e.dataTransfer.files);
+});
+imageInput.addEventListener('change', () => showPreviews(imageInput.files));
+
+function showPreviews(files) {
+  [...files].forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const div = document.createElement('div');
+      div.className = 'img-preview-item new-img';
+      div.innerHTML = `<img src="${e.target.result}" alt=""><button type="button" class="img-delete-btn" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;
+      preview.appendChild(div);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function deleteImage(imgId, btn) {
+  if (!confirm('Delete this image?')) return;
+  const res = await fetch(`/owner/property/image/${imgId}/delete`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json'}
+  });
+  const data = await res.json();
+  if (data.success) btn.closest('.img-preview-item').remove();
+}
+
+function addAmenity() {
+  const row = document.createElement('div');
+  row.className = 'amenity-input-row';
+  row.innerHTML = `<input type="text" name="amenities[]" class="form-input" placeholder="Amenity name"><button type="button" class="btn btn-xs btn-danger" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;
+  document.getElementById('amenitiesBuilder').appendChild(row);
+}
+</script>
+{% endblock %}

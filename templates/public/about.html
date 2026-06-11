@@ -1,0 +1,64 @@
+{% extends "partials/base.html" %}
+{% block title %}About Us - {{ settings.site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero">
+  <div class="container">
+    <h1>About Us</h1>
+    <p>Meet your trusted real estate partner</p>
+  </div>
+</section>
+
+<section class="section about-section">
+  <div class="container">
+    <div class="about-layout">
+      <div class="about-image" data-aos="fade-right">
+        {% if settings.agent_photo %}
+          <img src="{{ url_for('static', filename='uploads/profiles/' + settings.agent_photo) }}" alt="{{ settings.agent_name }}" class="about-photo">
+        {% else %}
+          <div class="about-photo-placeholder"><i class="fas fa-user fa-5x"></i></div>
+        {% endif %}
+      </div>
+      <div class="about-content" data-aos="fade-left">
+        <span class="section-eyebrow">Your Trusted Agent</span>
+        <h2>{{ settings.agent_name }}</h2>
+        <p class="agent-title-text">{{ settings.agent_title }}</p>
+        <div class="about-bio">{{ settings.agent_bio }}</div>
+
+        <div class="about-details">
+          {% if settings.agent_experience %}
+          <div class="detail-row"><i class="fas fa-briefcase"></i><span><strong>Experience:</strong> {{ settings.agent_experience }}</span></div>
+          {% endif %}
+          {% if settings.agent_certifications %}
+          <div class="detail-row"><i class="fas fa-certificate"></i><span><strong>Certifications:</strong> {{ settings.agent_certifications }}</span></div>
+          {% endif %}
+          {% if settings.agent_languages %}
+          <div class="detail-row"><i class="fas fa-language"></i><span><strong>Languages:</strong> {{ settings.agent_languages }}</span></div>
+          {% endif %}
+          <div class="detail-row"><i class="fas fa-phone"></i><span><strong>Phone:</strong> <a href="tel:{{ settings.phone }}">{{ settings.phone }}</a></span></div>
+          <div class="detail-row"><i class="fas fa-envelope"></i><span><strong>Email:</strong> <a href="mailto:{{ settings.email }}">{{ settings.email }}</a></span></div>
+          <div class="detail-row"><i class="fas fa-map-marker-alt"></i><span><strong>Office:</strong> {{ settings.address }}</span></div>
+        </div>
+
+        <div class="about-actions">
+          <a href="https://wa.me/{{ settings.agent_whatsapp or settings.whatsapp }}" target="_blank" class="btn btn-whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+          <a href="{{ url_for('contact') }}" class="btn btn-primary">Contact Us</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="about-stats" data-aos="fade-up">
+      <div class="stat-box"><h3>500+</h3><p>Properties Sold</p></div>
+      <div class="stat-box"><h3>1000+</h3><p>Happy Clients</p></div>
+      <div class="stat-box"><h3>10+</h3><p>Years Experience</p></div>
+      <div class="stat-box"><h3>50+</h3><p>Premium Listings</p></div>
+    </div>
+  </div>
+</section>
+
+{% if settings.google_maps_embed %}
+<section class="map-section">
+  <div class="map-container">{{ settings.google_maps_embed|safe }}</div>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,341 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}Developer Settings{% endblock %}
+{% block page_title %}Developer Settings{% endblock %}
+
+{% block content %}
+<div class="dev-banner"><i class="fas fa-shield-alt"></i><span>Developer Mode — Full Control</span></div>
+
+<!-- Live Theme Preview -->
+<div class="theme-preview-bar" id="themePreview">
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <span style="font-weight:700;font-size:.875rem">🎨 Theme Preview:</span>
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <div id="liveColorDot" style="width:28px;height:28px;border-radius:50%;background:{{ settings.primary_color or '#1a56db' }};border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,.2)"></div>
+      <span id="liveColorVal" style="font-size:.8rem;font-family:monospace">{{ settings.primary_color or '#1a56db' }}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <div id="liveAccentDot" style="width:28px;height:28px;border-radius:50%;background:{{ settings.accent_color or '#f59e0b' }};border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,.2)"></div>
+      <span id="liveAccentVal" style="font-size:.8rem;font-family:monospace">{{ settings.accent_color or '#f59e0b' }}</span>
+    </div>
+    <span id="liveSiteName" style="font-weight:800;font-size:1rem">{{ settings.site_name }}</span>
+    <a href="{{ url_for('index') }}" target="_blank" class="btn btn-xs btn-outline">Open Site <i class="fas fa-external-link-alt"></i></a>
+  </div>
+</div>
+
+<form method="POST" enctype="multipart/form-data" id="devSettingsForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="settings-tabs">
+    <button type="button" class="settings-tab active" onclick="showTab('site',this)"><i class="fas fa-globe"></i> Site</button>
+    <button type="button" class="settings-tab" onclick="showTab('theme',this)"><i class="fas fa-palette"></i> Theme</button>
+    <button type="button" class="settings-tab" onclick="showTab('code',this)"><i class="fas fa-code"></i> Custom Code</button>
+    <button type="button" class="settings-tab" onclick="showTab('security',this)"><i class="fas fa-shield-alt"></i> Security</button>
+    <button type="button" class="settings-tab" onclick="showTab('maintenance',this)"><i class="fas fa-tools"></i> Maintenance</button>
+    <button type="button" class="settings-tab" onclick="showTab('smtp',this)"><i class="fas fa-envelope"></i> SMTP</button>
+  </div>
+
+  <!-- SITE -->
+  <div id="tab-site" class="settings-panel active">
+    <div class="card"><div class="card-header"><h3>Site Information</h3></div><div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Site Name</label>
+          <input type="text" name="site_name" class="form-input" value="{{ settings.site_name }}" oninput="document.getElementById('liveSiteName').textContent=this.value">
+        </div>
+        <div class="form-group">
+          <label>Tagline</label>
+          <input type="text" name="tagline" class="form-input" value="{{ settings.tagline }}">
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" name="phone" class="form-input" value="{{ settings.phone }}">
+        </div>
+        <div class="form-group">
+          <label>WhatsApp</label>
+          <input type="text" name="whatsapp" class="form-input" value="{{ settings.whatsapp }}">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" name="email" class="form-input" value="{{ settings.email }}">
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <input type="text" name="address" class="form-input" value="{{ settings.address }}">
+        </div>
+        <div class="form-group">
+          <label>Hero Title</label>
+          <input type="text" name="hero_title" class="form-input" value="{{ settings.hero_title }}">
+        </div>
+        <div class="form-group">
+          <label>Hero Subtitle</label>
+          <input type="text" name="hero_subtitle" class="form-input" value="{{ settings.hero_subtitle }}">
+        </div>
+        <div class="form-group">
+          <label>Meta Title</label>
+          <input type="text" name="meta_title" class="form-input" value="{{ settings.meta_title }}">
+        </div>
+        <div class="form-group">
+          <label>Meta Description</label>
+          <textarea name="meta_description" class="form-input" rows="2">{{ settings.meta_description }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Map Latitude</label>
+          <input type="text" name="map_lat" class="form-input" value="{{ settings.map_lat or '19.0760' }}">
+        </div>
+        <div class="form-group">
+          <label>Map Longitude</label>
+          <input type="text" name="map_lng" class="form-input" value="{{ settings.map_lng or '72.8777' }}">
+        </div>
+        <div class="form-group">
+          <label>Map Zoom</label>
+          <input type="number" name="map_zoom" class="form-input" value="{{ settings.map_zoom or '12' }}" min="1" max="18">
+        </div>
+        <div class="form-group form-col-2">
+          <label>Google Maps Embed (optional legacy)</label>
+          <textarea name="google_maps_embed" class="form-input" rows="2">{{ settings.google_maps_embed }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Logo</label>
+          <input type="file" name="logo" accept="image/*" class="form-input" onchange="previewFile(this,'logoPreview')">
+          {% if settings.logo %}<img id="logoPreview" src="{{ url_for('static',filename='uploads/profiles/'+settings.logo) }}" class="form-image-preview">
+          {% else %}<img id="logoPreview" src="" class="form-image-preview" style="display:none">{% endif %}
+        </div>
+        <div class="form-group">
+          <label>Favicon</label>
+          <input type="file" name="favicon" class="form-input">
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- THEME -->
+  <div id="tab-theme" class="settings-panel">
+    <div class="card"><div class="card-header"><h3>Theme & Colors</h3></div><div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Primary Color</label>
+          <div style="display:flex;gap:.75rem;align-items:center">
+            <input type="color" name="primary_color" id="primaryColorPicker" class="form-input color-input" value="{{ settings.primary_color or '#1a56db' }}" oninput="updateThemePreview('primary',this.value)">
+            <input type="text" id="primaryColorText" class="form-input" value="{{ settings.primary_color or '#1a56db' }}" placeholder="#1a56db" style="flex:1;font-family:monospace" oninput="document.getElementById('primaryColorPicker').value=this.value;updateThemePreview('primary',this.value)">
+          </div>
+          <div class="color-presets" style="display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap">
+            {% for c in ['#1a56db','#7c3aed','#059669','#dc2626','#ea580c','#0891b2','#be185d','#1d4ed8'] %}
+            <button type="button" onclick="setColor('primary','{{ c }}')" style="width:32px;height:32px;background:{{ c }};border-radius:6px;border:2px solid transparent;cursor:pointer;transition:.2s" title="{{ c }}"></button>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Accent Color</label>
+          <div style="display:flex;gap:.75rem;align-items:center">
+            <input type="color" name="accent_color" id="accentColorPicker" class="form-input color-input" value="{{ settings.accent_color or '#f59e0b' }}" oninput="updateThemePreview('accent',this.value)">
+            <input type="text" id="accentColorText" class="form-input" value="{{ settings.accent_color or '#f59e0b' }}" placeholder="#f59e0b" style="flex:1;font-family:monospace" oninput="document.getElementById('accentColorPicker').value=this.value;updateThemePreview('accent',this.value)">
+          </div>
+          <div class="color-presets" style="display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap">
+            {% for c in ['#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316'] %}
+            <button type="button" onclick="setColor('accent','{{ c }}')" style="width:32px;height:32px;background:{{ c }};border-radius:6px;border:2px solid transparent;cursor:pointer;transition:.2s" title="{{ c }}"></button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Theme Demo -->
+      <div class="theme-demo" style="margin-top:1.5rem;padding:1.5rem;border:1.5px solid #e2e8f0;border-radius:12px;">
+        <h4 style="margin-bottom:1rem;font-size:.9rem;color:#64748b">Live Theme Demo</h4>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center">
+          <button class="btn-demo-primary">Primary Button</button>
+          <button class="btn-demo-accent">Accent Button</button>
+          <span class="badge-demo">Featured</span>
+          <a href="#" style="color:var(--primary-preview,#1a56db);font-weight:600">Link Style</a>
+          <div style="width:40px;height:40px;border-radius:10px;background:var(--primary-preview,#1a56db);display:flex;align-items:center;justify-content:center;color:white"><i class="fas fa-home"></i></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- CUSTOM CODE -->
+  <div id="tab-code" class="settings-panel">
+    <div class="card"><div class="card-header"><h3>Custom CSS</h3></div><div class="card-body">
+      <div class="form-group">
+        <label>Custom CSS <span style="color:#64748b;font-size:.8rem">— Injected in &lt;head&gt; on every public page</span></label>
+        <textarea name="custom_css" class="form-input code-input" rows="12" placeholder="/* Custom styles */&#10;.navbar { background: #fff; }&#10;.hero { min-height: 90vh; }">{{ settings.custom_css }}</textarea>
+      </div>
+    </div></div>
+    <div class="card"><div class="card-header"><h3>Custom JavaScript</h3></div><div class="card-body">
+      <div class="form-group">
+        <label>Custom JS <span style="color:#64748b;font-size:.8rem">— Injected before &lt;/body&gt;</span></label>
+        <textarea name="custom_js" class="form-input code-input" rows="12" placeholder="// Custom scripts&#10;console.log('Site loaded');&#10;// Add analytics, chat widgets, etc.">{{ settings.custom_js }}</textarea>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- SECURITY -->
+  <div id="tab-security" class="settings-panel">
+    <div class="card"><div class="card-header"><h3>Login Path Security</h3></div><div class="card-body">
+      <p style="color:#64748b;margin-bottom:1.5rem;font-size:.9rem">Change the login URL paths to prevent unauthorized access attempts. Do not share these paths publicly.</p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Owner Login Path <span style="color:#ef4444">*</span></label>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="color:#64748b;font-size:.9rem">/</span>
+            <input type="text" name="admin_path" class="form-input" value="{{ settings.admin_path or 'admin' }}" placeholder="admin" id="adminPathInput" oninput="updateLoginPreview()">
+            <span style="color:#64748b;font-size:.9rem">/login</span>
+          </div>
+          <small class="form-hint" id="ownerLoginPreview">Current: /{{ settings.admin_path or 'admin' }}/login</small>
+        </div>
+        <div class="form-group">
+          <label>Developer Login Path <span style="color:#ef4444">*</span></label>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="color:#64748b;font-size:.9rem">/</span>
+            <input type="text" name="dev_path" class="form-input" value="{{ settings.dev_path or 'devcontrol' }}" placeholder="devcontrol" id="devPathInput" oninput="updateLoginPreview()">
+            <span style="color:#64748b;font-size:.9rem">/login</span>
+          </div>
+          <small class="form-hint" id="devLoginPreview">Current: /{{ settings.dev_path or 'devcontrol' }}/login</small>
+        </div>
+      </div>
+      <div class="alert alert-info" style="margin-top:1rem">
+        <i class="fas fa-info-circle"></i>
+        <strong>Important:</strong> After saving, the old login URLs will stop working. Bookmark the new URLs before saving!
+      </div>
+      <div style="margin-top:1rem;padding:1rem;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+        <p style="font-size:.875rem;font-weight:700;margin-bottom:.5rem">New login URLs will be:</p>
+        <p style="font-family:monospace;font-size:.875rem;color:#1a56db" id="newUrlPreview">
+          Owner: /<span id="previewAdminPath">{{ settings.admin_path or 'admin' }}</span>/login<br>
+          Developer: /<span id="previewDevPath">{{ settings.dev_path or 'devcontrol' }}</span>/login
+        </p>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- MAINTENANCE -->
+  <div id="tab-maintenance" class="settings-panel">
+    <div class="card"><div class="card-header"><h3>Maintenance Mode</h3></div><div class="card-body">
+      <div class="maintenance-toggle-wrap">
+        <div class="maintenance-info">
+          <h4>Maintenance Mode</h4>
+          <p style="color:#64748b;font-size:.9rem;margin:.5rem 0 1.5rem">When ON, public visitors see a maintenance page. Developers can still access the site normally.</p>
+          <div class="toggle-switch-wrap">
+            <label class="toggle-switch">
+              <input type="checkbox" name="maintenance_mode" value="true" id="maintToggle" {% if settings.maintenance_mode=='true' %}checked{% endif %} onchange="updateMaintStatus()">
+              <span class="toggle-slider"></span>
+            </label>
+            <span id="maintLabel" style="font-weight:700;font-size:1rem">{{ '🔴 Maintenance ON' if settings.maintenance_mode=='true' else '🟢 Site is Live' }}</span>
+          </div>
+          <input type="hidden" name="maintenance_mode" id="maintHidden" value="{{ settings.maintenance_mode or 'false' }}">
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- SMTP -->
+  <div id="tab-smtp" class="settings-panel">
+    <div class="card"><div class="card-header"><h3>SMTP Email Settings</h3></div><div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>SMTP Host</label>
+          <input type="text" name="smtp_host" class="form-input" value="{{ settings.smtp_host }}" placeholder="smtp.gmail.com">
+        </div>
+        <div class="form-group">
+          <label>SMTP Port</label>
+          <input type="text" name="smtp_port" class="form-input" value="{{ settings.smtp_port }}" placeholder="587">
+        </div>
+        <div class="form-group">
+          <label>Username / Email</label>
+          <input type="text" name="smtp_user" class="form-input" value="{{ settings.smtp_user }}">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" name="smtp_pass" class="form-input" placeholder="Leave blank to keep current">
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div style="position:sticky;bottom:0;background:white;border-top:1px solid #e2e8f0;padding:1rem;margin-top:1.5rem;z-index:10;display:flex;gap:.75rem;flex-wrap:wrap">
+    <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Save All Settings</button>
+    <a href="{{ url_for('index') }}" target="_blank" class="btn btn-outline"><i class="fas fa-eye"></i> Preview Site</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+function updateThemePreview(type, val) {
+  if (type === 'primary') {
+    document.getElementById('liveColorDot').style.background = val;
+    document.getElementById('liveColorVal').textContent = val;
+    document.getElementById('primaryColorText').value = val;
+    document.querySelectorAll('.btn-demo-primary').forEach(b => b.style.background = val);
+    document.documentElement.style.setProperty('--primary-preview', val);
+  } else {
+    document.getElementById('liveAccentDot').style.background = val;
+    document.getElementById('liveAccentVal').textContent = val;
+    document.getElementById('accentColorText').value = val;
+    document.querySelectorAll('.btn-demo-accent').forEach(b => b.style.background = val);
+    document.querySelectorAll('.badge-demo').forEach(b => b.style.background = val);
+  }
+}
+
+function setColor(type, val) {
+  if (type === 'primary') {
+    document.getElementById('primaryColorPicker').value = val;
+    updateThemePreview('primary', val);
+  } else {
+    document.getElementById('accentColorPicker').value = val;
+    updateThemePreview('accent', val);
+  }
+}
+
+function updateLoginPreview() {
+  const ap = document.getElementById('adminPathInput').value || 'admin';
+  const dp = document.getElementById('devPathInput').value || 'devcontrol';
+  document.getElementById('previewAdminPath').textContent = ap;
+  document.getElementById('previewDevPath').textContent = dp;
+  document.getElementById('ownerLoginPreview').textContent = 'Will be: /' + ap + '/login';
+  document.getElementById('devLoginPreview').textContent = 'Will be: /' + dp + '/login';
+}
+
+function updateMaintStatus() {
+  const checked = document.getElementById('maintToggle').checked;
+  document.getElementById('maintHidden').value = checked ? 'true' : 'false';
+  document.getElementById('maintLabel').textContent = checked ? '🔴 Maintenance ON' : '🟢 Site is Live';
+}
+
+function previewFile(input, previewId) {
+  const preview = document.getElementById(previewId);
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => { preview.src = e.target.result; preview.style.display = 'block'; };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+// Handle maintenance_mode correctly - only one value sent
+document.getElementById('devSettingsForm').addEventListener('submit', function() {
+  const checked = document.getElementById('maintToggle').checked;
+  document.getElementById('maintHidden').value = checked ? 'true' : 'false';
+});
+</script>
+<style>
+.theme-preview-bar{background:linear-gradient(135deg,#0f172a,#1e3a6f);color:white;padding:1rem 1.5rem;border-radius:12px;margin-bottom:1.5rem}
+.btn-demo-primary{background:#1a56db;color:white;border:none;padding:.6rem 1.2rem;border-radius:8px;font-weight:600;cursor:pointer;transition:.2s}
+.btn-demo-accent{background:#f59e0b;color:white;border:none;padding:.6rem 1.2rem;border-radius:8px;font-weight:600;cursor:pointer;transition:.2s}
+.badge-demo{background:#f59e0b;color:white;padding:.3rem .8rem;border-radius:20px;font-size:.75rem;font-weight:700}
+.toggle-switch-wrap{display:flex;align-items:center;gap:1rem;margin-top:.5rem}
+.toggle-switch{position:relative;display:inline-block;width:60px;height:32px}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:#cbd5e1;border-radius:32px;cursor:pointer;transition:.3s}
+.toggle-slider:before{content:'';position:absolute;width:24px;height:24px;left:4px;bottom:4px;background:white;border-radius:50%;transition:.3s}
+.toggle-switch input:checked+.toggle-slider{background:#22c55e}
+.toggle-switch input:checked+.toggle-slider:before{transform:translateX(28px)}
+.preview-bar{background:linear-gradient(90deg,#1a56db,#7c3aed);color:white;padding:.875rem 1.5rem;border-radius:12px;margin-bottom:1.5rem}
+.preview-bar-inner{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.preview-color-dot{width:24px;height:24px;border-radius:50%;border:2px solid rgba(255,255,255,.5)}
+</style>
+{% endblock %}

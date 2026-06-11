@@ -1,0 +1,234 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}External Links{% endblock %}
+{% block page_title %}External Links Manager{% endblock %}
+
+{% block content %}
+<div class="dev-banner">
+  <i class="fas fa-link"></i>
+  <span>Connect external websites — links appear in navigation, footer, social icons, or as embedded pages</span>
+</div>
+
+<div class="dashboard-grid">
+  <!-- Add Link Form -->
+  <div class="card">
+    <div class="card-header"><h3>Add External Link</h3></div>
+    <div class="card-body">
+      <form method="POST" id="addLinkForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="add">
+
+        <div class="form-group">
+          <label>Link Name *</label>
+          <input type="text" name="name" required class="form-input" placeholder="e.g. Portfolio, Partner Site">
+        </div>
+        <div class="form-group">
+          <label>URL *</label>
+          <input type="url" name="url" required class="form-input" placeholder="https://example.com">
+        </div>
+        <div class="form-group">
+          <label>Link Type</label>
+          <select name="link_type" class="form-input" id="linkTypeSelect" onchange="updateOpenInOptions()">
+            {% for lt in link_types %}
+            <option value="{{ lt }}">{{ lt|replace('_',' ')|title }}</option>
+            {% endfor %}
+          </select>
+          <small class="form-hint">
+            <strong>Header Nav</strong> — Shows in top navigation bar<br>
+            <strong>Footer</strong> — Shows in footer links<br>
+            <strong>Social</strong> — Shows as social icon in footer<br>
+            <strong>Iframe</strong> — Opens embedded inside site page<br>
+            <strong>Redirect</strong> — Full redirect to external URL<br>
+            <strong>Custom Page</strong> — Creates a /page/name route
+          </small>
+        </div>
+        <div class="form-group">
+          <label>Open In</label>
+          <select name="open_in" class="form-input" id="openInSelect">
+            <option value="_blank">New Tab</option>
+            <option value="_self">Same Tab</option>
+            <option value="iframe">Embedded iFrame</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Description (optional)</label>
+          <input type="text" name="description" class="form-input" placeholder="Brief description of this link">
+        </div>
+        <div class="form-group">
+          <label>Sort Order</label>
+          <input type="number" name="sort_order" class="form-input" value="0" min="0">
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" name="is_active" checked>
+            <span>Active (visible on site)</span>
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add Link</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Links List -->
+  <div class="card">
+    <div class="card-header">
+      <h3>All External Links ({{ links|length }})</h3>
+    </div>
+    <div class="card-body">
+      {% if links %}
+      {% set grouped = {} %}
+      {% for link in links %}
+        {% if link.link_type not in grouped %}{% set _ = grouped.update({link.link_type: []}) %}{% endif %}
+        {% set _ = grouped[link.link_type].append(link) %}
+      {% endfor %}
+
+      {% for link_type, type_links in grouped.items() %}
+      <div class="link-type-group">
+        <h4 class="link-type-header">
+          <i class="fas fa-{% if link_type == 'header_nav' %}bars{% elif link_type == 'footer' %}shoe-prints{% elif link_type == 'social' %}share-alt{% elif link_type == 'iframe' %}window-maximize{% elif link_type == 'custom_page' %}file{% else %}external-link-alt{% endif %}"></i>
+          {{ link_type|replace('_',' ')|title }}
+        </h4>
+        {% for link in type_links %}
+        <div class="link-admin-card {% if not link.is_active %}link-inactive{% endif %}">
+          <div class="link-admin-info">
+            <div class="link-admin-header">
+              <strong>{{ link.name }}</strong>
+              <span class="badge {% if link.is_active %}badge-active{% else %}badge-inactive{% endif %}">
+                {{ 'Active' if link.is_active else 'Inactive' }}
+              </span>
+            </div>
+            <a href="{{ link.url }}" target="_blank" class="link-url">{{ link.url[:60] }}{% if link.url|length > 60 %}...{% endif %}</a>
+            {% if link.description %}<p class="link-desc">{{ link.description }}</p>{% endif %}
+            <small>Opens: {{ link.open_in }} | Order: {{ link.sort_order }}</small>
+          </div>
+          <div class="link-admin-actions">
+            <!-- Toggle -->
+            <form method="POST" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="action" value="toggle">
+              <input type="hidden" name="link_id" value="{{ link.id }}">
+              <button type="submit" class="btn btn-xs btn-outline" title="{{ 'Deactivate' if link.is_active else 'Activate' }}">
+                <i class="fas fa-{{ 'toggle-on' if link.is_active else 'toggle-off' }}"></i>
+              </button>
+            </form>
+            <!-- Edit -->
+            <button class="btn btn-xs btn-primary" onclick="showEditForm({{ link.id }})"><i class="fas fa-edit"></i></button>
+            <!-- Delete -->
+            <form method="POST" style="display:inline" onsubmit="return confirm('Remove this link?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="link_id" value="{{ link.id }}">
+              <button type="submit" class="btn btn-xs btn-danger"><i class="fas fa-trash"></i></button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Edit Form (hidden) -->
+        <div id="edit-form-{{ link.id }}" class="edit-link-form" style="display:none;">
+          <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="link_id" value="{{ link.id }}">
+            <div class="form-grid">
+              <div class="form-group"><label>Name</label><input type="text" name="name" class="form-input" value="{{ link.name }}"></div>
+              <div class="form-group"><label>URL</label><input type="url" name="url" class="form-input" value="{{ link.url }}"></div>
+              <div class="form-group">
+                <label>Type</label>
+                <select name="link_type" class="form-input">
+                  {% for lt in link_types %}<option value="{{ lt }}" {% if lt == link.link_type %}selected{% endif %}>{{ lt|replace('_',' ')|title }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Open In</label>
+                <select name="open_in" class="form-input">
+                  <option value="_blank" {% if link.open_in == '_blank' %}selected{% endif %}>New Tab</option>
+                  <option value="_self" {% if link.open_in == '_self' %}selected{% endif %}>Same Tab</option>
+                  <option value="iframe" {% if link.open_in == 'iframe' %}selected{% endif %}>iFrame</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Description</label><input type="text" name="description" class="form-input" value="{{ link.description or '' }}"></div>
+              <div class="form-group"><label>Sort Order</label><input type="number" name="sort_order" class="form-input" value="{{ link.sort_order }}"></div>
+              <div class="form-group form-col-2">
+                <label class="checkbox-label"><input type="checkbox" name="is_active" {% if link.is_active %}checked{% endif %}><span>Active</span></label>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary btn-sm">Save</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="hideEditForm({{ link.id }})">Cancel</button>
+            </div>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+      {% else %}
+      <div class="empty-state">
+        <i class="fas fa-link"></i>
+        <h3>No External Links</h3>
+        <p>Add your first external link to connect other websites to your platform.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Usage Guide -->
+<div class="card">
+  <div class="card-header"><h3><i class="fas fa-info-circle"></i> How External Links Work</h3></div>
+  <div class="card-body">
+    <div class="info-grid">
+      <div class="info-card">
+        <i class="fas fa-bars"></i>
+        <h4>Header Navigation</h4>
+        <p>Links appear in the top navigation bar alongside Home, Properties, etc.</p>
+      </div>
+      <div class="info-card">
+        <i class="fas fa-shoe-prints"></i>
+        <h4>Footer Links</h4>
+        <p>Links appear in the footer's Quick Links column.</p>
+      </div>
+      <div class="info-card">
+        <i class="fas fa-share-alt"></i>
+        <h4>Social Icons</h4>
+        <p>Links appear as social media icons in the footer.</p>
+      </div>
+      <div class="info-card">
+        <i class="fas fa-window-maximize"></i>
+        <h4>iFrame Embed</h4>
+        <p>External site loads inside your website on a dedicated page.</p>
+      </div>
+      <div class="info-card">
+        <i class="fas fa-file"></i>
+        <h4>Custom Page</h4>
+        <p>Accessible at /page/[name] — can be linked to from anywhere.</p>
+      </div>
+      <div class="info-card">
+        <i class="fas fa-external-link-alt"></i>
+        <h4>Redirect</h4>
+        <p>Shows a redirect confirmation page with a button to open the URL.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showEditForm(id) {
+  document.querySelectorAll('.edit-link-form').forEach(f => f.style.display = 'none');
+  document.getElementById('edit-form-' + id).style.display = 'block';
+}
+function hideEditForm(id) {
+  document.getElementById('edit-form-' + id).style.display = 'none';
+}
+function updateOpenInOptions() {
+  const type = document.getElementById('linkTypeSelect').value;
+  const openIn = document.getElementById('openInSelect');
+  if (type === 'iframe') {
+    openIn.value = 'iframe';
+  } else if (type === 'social' || type === 'footer') {
+    openIn.value = '_blank';
+  }
+}
+</script>
+{% endblock %}

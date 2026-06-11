@@ -1,0 +1,75 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}Testimonials{% endblock %}
+{% block page_title %}Testimonials{% endblock %}
+
+{% block content %}
+<div class="dashboard-grid">
+  <div class="card">
+    <div class="card-header"><h3>Add Testimonial</h3></div>
+    <div class="card-body">
+      <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="add">
+        <div class="form-group">
+          <label>Client Name *</label>
+          <input type="text" name="name" required class="form-input" placeholder="John Doe">
+        </div>
+        <div class="form-group">
+          <label>Designation</label>
+          <input type="text" name="designation" class="form-input" placeholder="Business Owner">
+        </div>
+        <div class="form-group">
+          <label>Rating</label>
+          <select name="rating" class="form-input">
+            {% for r in [5,4,3,2,1] %}<option value="{{ r }}">{{ r }} Stars</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Testimonial *</label>
+          <textarea name="content" required class="form-input" rows="3" placeholder="What the client said..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Photo</label>
+          <input type="file" name="photo" accept="image/*" class="form-input">
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>All Testimonials ({{ testimonials|length }})</h3></div>
+    <div class="card-body">
+      {% if testimonials %}
+      <div class="testimonials-admin-list">
+        {% for t in testimonials %}
+        <div class="testimonial-admin-card">
+          <div class="testimonial-admin-header">
+            {% if t.photo %}
+              <img src="{{ url_for('static', filename='uploads/profiles/' + t.photo) }}" alt="{{ t.name }}" class="testimonial-admin-photo">
+            {% else %}
+              <div class="testimonial-admin-photo placeholder"><i class="fas fa-user"></i></div>
+            {% endif %}
+            <div>
+              <strong>{{ t.name }}</strong>
+              {% if t.designation %}<span>{{ t.designation }}</span>{% endif %}
+              <div class="stars-sm">{% for i in range(t.rating) %}<i class="fas fa-star"></i>{% endfor %}</div>
+            </div>
+          </div>
+          <p class="testimonial-admin-text">{{ t.content[:120] }}...</p>
+          <form method="POST" onsubmit="return confirm('Delete?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="id" value="{{ t.id }}">
+            <button type="submit" class="btn btn-xs btn-danger"><i class="fas fa-trash"></i> Delete</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state-sm"><i class="fas fa-star"></i><p>No testimonials yet.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

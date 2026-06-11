@@ -1,0 +1,54 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}{{ 'Edit' if post else 'New' }} Blog Post{% endblock %}
+{% block page_title %}{{ 'Edit' if post else 'New' }} Blog Post{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3>{{ 'Edit' if post else 'Create New' }} Blog Post</h3>
+    <a href="{{ url_for('owner_blog') }}" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back</a>
+  </div>
+  <div class="card-body">
+    <form method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label>Post Title *</label>
+        <input type="text" name="title" required class="form-input" value="{{ post.title if post else '' }}" placeholder="Enter blog post title">
+      </div>
+      <div class="form-group">
+        <label>Excerpt (Short Summary)</label>
+        <textarea name="excerpt" class="form-input" rows="2" placeholder="Brief description shown in listing...">{{ post.excerpt if post else '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Content *</label>
+        <textarea name="content" required class="form-input blog-content" rows="15" placeholder="Write your blog content here... (HTML supported)">{{ post.content if post else '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Featured Image</label>
+        <input type="file" name="featured_image" accept="image/*" class="form-input">
+        {% if post and post.featured_image %}
+        <img src="{{ url_for('static', filename='uploads/blog/' + post.featured_image) }}" alt="" class="form-image-preview">
+        {% endif %}
+      </div>
+      <div class="form-group">
+        <label>Meta Title (SEO)</label>
+        <input type="text" name="meta_title" class="form-input" value="{{ post.meta_title if post else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Meta Description (SEO)</label>
+        <textarea name="meta_description" class="form-input" rows="2">{{ post.meta_description if post else '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" name="is_published" {% if post and post.is_published %}checked{% endif %}>
+          <span>Publish immediately</span>
+        </label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Post</button>
+        <a href="{{ url_for('owner_blog') }}" class="btn btn-outline">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

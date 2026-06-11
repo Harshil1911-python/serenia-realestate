@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Under Maintenance - {{ settings.site_name }}</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; align-items: center; justify-content: center; min-height: 100vh; text-align: center; padding: 2rem; }
+    .icon { font-size: 4rem; margin-bottom: 1.5rem; }
+    h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+    p { color: #94a3b8; font-size: 1.1rem; max-width: 500px; }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="icon">🔧</div>
+    <h1>Under Maintenance</h1>
+    <p>{{ settings.site_name }} is currently undergoing scheduled maintenance. We'll be back soon!</p>
+    <p style="margin-top:1rem;">Contact: <a href="tel:{{ settings.phone }}" style="color:#60a5fa;">{{ settings.phone }}</a></p>
+  </div>
+</body>
+</html>

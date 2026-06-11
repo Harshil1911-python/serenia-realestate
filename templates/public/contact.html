@@ -1,0 +1,99 @@
+{% extends "partials/base.html" %}
+{% block title %}Contact Us - {{ settings.site_name }}{% endblock %}
+{% block content %}
+<section class="page-hero">
+  <div class="container">
+    <h1>Let's Work Together</h1>
+    <p>Have a project in mind? Let's talk and make it happen.</p>
+  </div>
+</section>
+
+<section class="section contact-section">
+  <div class="container">
+    <div class="contact-layout">
+      <!-- Left Info -->
+      <div class="contact-info-col" data-aos="fade-right">
+        <div class="contact-cards">
+          <div class="contact-card">
+            <div class="contact-card-icon"><i class="fas fa-envelope"></i></div>
+            <div><span class="contact-card-label">EMAIL</span><a href="mailto:{{ settings.email }}">{{ settings.email }}</a></div>
+          </div>
+          <div class="contact-card">
+            <div class="contact-card-icon"><i class="fas fa-phone"></i></div>
+            <div><span class="contact-card-label">PHONE</span><a href="tel:{{ settings.phone }}">{{ settings.phone }}</a></div>
+          </div>
+          <div class="contact-card">
+            <div class="contact-card-icon"><i class="fas fa-map-marker-alt"></i></div>
+            <div><span class="contact-card-label">LOCATION</span><span>{{ settings.address }}</span></div>
+          </div>
+        </div>
+
+        <div class="contact-social">
+          <p class="social-label">Follow Me</p>
+          <div class="social-row">
+            {% if settings.facebook %}<a href="{{ settings.facebook }}" target="_blank" class="soc-btn"><i class="fab fa-facebook-f"></i></a>{% endif %}
+            {% if settings.instagram %}<a href="{{ settings.instagram }}" target="_blank" class="soc-btn"><i class="fab fa-instagram"></i></a>{% endif %}
+            {% if settings.twitter %}<a href="{{ settings.twitter }}" target="_blank" class="soc-btn"><i class="fab fa-twitter"></i></a>{% endif %}
+            {% if settings.linkedin %}<a href="{{ settings.linkedin }}" target="_blank" class="soc-btn"><i class="fab fa-linkedin-in"></i></a>{% endif %}
+            <a href="https://wa.me/{{ settings.whatsapp }}" target="_blank" class="soc-btn soc-wa"><i class="fab fa-whatsapp"></i></a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Form -->
+      <div class="contact-form-col" data-aos="fade-left">
+        <form method="POST" action="{{ url_for('contact') }}" class="contact-form" id="contactForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="form-row-2">
+            <div class="form-group">
+              <label>Your Name *</label>
+              <input type="text" name="name" required class="form-input" placeholder="John Doe">
+            </div>
+            <div class="form-group">
+              <label>Email Address *</label>
+              <input type="email" name="email" required class="form-input" placeholder="john@example.com">
+            </div>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label>Phone</label>
+              <input type="tel" name="phone" class="form-input" placeholder="+91 99999 00000">
+            </div>
+            <div class="form-group">
+              <label>Subject *</label>
+              <input type="text" name="subject" required class="form-input" placeholder="Property Inquiry">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Message *</label>
+            <textarea name="message" rows="5" required class="form-input" placeholder="Tell me about your project..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block btn-send">
+            <i class="fas fa-paper-plane"></i> Send Message
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- OpenStreetMap -->
+<section class="map-section">
+  <div id="contactMap" style="height:420px;width:100%;"></div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const lat = parseFloat("{{ settings.map_lat or '19.0760' }}");
+const lng = parseFloat("{{ settings.map_lng or '72.8777' }}");
+const zoom = parseInt("{{ settings.map_zoom or '13' }}");
+const map = L.map('contactMap').setView([lat, lng], zoom);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+}).addTo(map);
+L.marker([lat, lng]).addTo(map)
+  .bindPopup('<strong>{{ settings.site_name }}</strong><br>{{ settings.address }}').openPopup();
+</script>
+{% endblock %}

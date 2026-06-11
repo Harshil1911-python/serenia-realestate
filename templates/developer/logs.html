@@ -1,0 +1,38 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}Activity Logs{% endblock %}
+{% block page_title %}Activity Logs{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3>Activity Logs</h3>
+    <a href="{{ url_for('database_overview') }}" class="btn btn-outline btn-sm">Database Overview</a>
+  </div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>#</th><th>User</th><th>Action</th><th>Details</th><th>IP Address</th><th>Time</th></tr></thead>
+        <tbody>
+          {% for log in logs.items %}
+          <tr>
+            <td>{{ log.id }}</td>
+            <td>{{ log.user.username if log.user else '<em>Guest</em>'|safe }}</td>
+            <td><span class="log-action">{{ log.action }}</span></td>
+            <td>{{ (log.details or '')[:80] }}</td>
+            <td><code>{{ log.ip_address or '—' }}</code></td>
+            <td>{{ log.created_at.strftime('%d %b %Y %H:%M') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if logs.pages > 1 %}
+    <div class="pagination">
+      {% if logs.has_prev %}<a href="{{ url_for('activity_logs', page=logs.prev_num) }}" class="page-btn"><i class="fas fa-chevron-left"></i></a>{% endif %}
+      {% for p in logs.iter_pages() %}{% if p %}<a href="{{ url_for('activity_logs', page=p) }}" class="page-btn {% if p == logs.page %}active{% endif %}">{{ p }}</a>{% endif %}{% endfor %}
+      {% if logs.has_next %}<a href="{{ url_for('activity_logs', page=logs.next_num) }}" class="page-btn"><i class="fas fa-chevron-right"></i></a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

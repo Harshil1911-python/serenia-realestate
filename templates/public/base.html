@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ settings.meta_title }}{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}{{ settings.meta_description }}{% endblock %}">
+  <meta name="robots" content="index,follow">
+  <meta property="og:title" content="{% block og_title %}{{ settings.site_name }}{% endblock %}">
+  <meta property="og:description" content="{{ settings.meta_description }}">
+  <meta property="og:type" content="website">
+  {% if settings.favicon %}
+  <link rel="icon" href="{{ url_for('static', filename='uploads/profiles/' + settings.favicon) }}">
+  {% endif %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    :root {
+      --primary: {{ settings.primary_color or '#1a56db' }};
+      --primary-dark: color-mix(in srgb, {{ settings.primary_color or '#1a56db' }} 85%, black);
+      --primary-light: color-mix(in srgb, {{ settings.primary_color or '#1a56db' }} 12%, white);
+      --accent: {{ settings.accent_color or '#f59e0b' }};
+    }
+  </style>
+  {% if settings.custom_css %}
+  <style>{{ settings.custom_css|safe }}</style>
+  {% endif %}
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar" id="navbar">
+  <div class="nav-container">
+    <a href="{{ url_for('index') }}" class="nav-logo">
+      {% if settings.logo %}
+        <img src="{{ url_for('static', filename='uploads/profiles/' + settings.logo) }}" alt="{{ settings.site_name }}" class="logo-img">
+      {% else %}
+        <span class="logo-text"><i class="fas fa-building"></i> {{ settings.site_name }}</span>
+      {% endif %}
+    </a>
+
+    <button class="nav-toggle" id="navToggle" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+
+    <ul class="nav-menu" id="navMenu">
+      <li><a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint=='index' %}active{% endif %}">Home</a></li>
+      <li><a href="{{ url_for('properties') }}" class="nav-link {% if request.endpoint=='properties' %}active{% endif %}">Properties</a></li>
+      <li><a href="{{ url_for('about') }}" class="nav-link {% if request.endpoint=='about' %}active{% endif %}">About</a></li>
+      <li><a href="{{ url_for('blog') }}" class="nav-link {% if request.endpoint in ['blog','blog_detail'] %}active{% endif %}">Blog</a></li>
+      <li><a href="{{ url_for('contact') }}" class="nav-link {% if request.endpoint=='contact' %}active{% endif %}">Contact</a></li>
+      {% for link in header_links %}
+      <li><a href="{{ link.url }}" class="nav-link" target="{{ link.open_in }}">{{ link.name }}</a></li>
+      {% endfor %}
+      <li class="nav-cta">
+        <a href="tel:{{ settings.phone }}" class="btn-call"><i class="fas fa-phone"></i> Call Now</a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-container" id="flashContainer">
+    {% for cat, msg in messages %}
+    <div class="flash flash-{{ cat }}">
+      <i class="fas fa-{% if cat=='success' %}check-circle{% elif cat=='danger' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+      <span>{{ msg }}</span>
+      <button onclick="this.parentElement.remove()" class="flash-close">&times;</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
+
+<main>{% block content %}{% endblock %}</main>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-top">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-col">
+          {% if settings.logo %}
+            <img src="{{ url_for('static', filename='uploads/profiles/' + settings.logo) }}" alt="{{ settings.site_name }}" class="logo-img-sm">
+          {% else %}
+            <span class="logo-text-white"><i class="fas fa-building"></i> {{ settings.site_name }}</span>
+          {% endif %}
+          <p class="footer-desc">{{ settings.tagline }}</p>
+          <div class="social-links">
+            {% if settings.facebook %}<a href="{{ settings.facebook }}" target="_blank" title="Facebook"><i class="fab fa-facebook-f"></i></a>{% endif %}
+            {% if settings.instagram %}<a href="{{ settings.instagram }}" target="_blank" title="Instagram"><i class="fab fa-instagram"></i></a>{% endif %}
+            {% if settings.twitter %}<a href="{{ settings.twitter }}" target="_blank" title="Twitter"><i class="fab fa-twitter"></i></a>{% endif %}
+            {% if settings.linkedin %}<a href="{{ settings.linkedin }}" target="_blank" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>{% endif %}
+            {% if settings.youtube %}<a href="{{ settings.youtube }}" target="_blank" title="YouTube"><i class="fab fa-youtube"></i></a>{% endif %}
+            {% for link in social_links %}
+            <a href="{{ link.url }}" target="{{ link.open_in }}" title="{{ link.name }}"><i class="fas fa-globe"></i></a>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="footer-col">
+          <h4>Quick Links</h4>
+          <ul>
+            <li><a href="{{ url_for('index') }}">Home</a></li>
+            <li><a href="{{ url_for('properties') }}">Properties</a></li>
+            <li><a href="{{ url_for('about') }}">About Us</a></li>
+            <li><a href="{{ url_for('blog') }}">Blog</a></li>
+            <li><a href="{{ url_for('contact') }}">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Property Types</h4>
+          <ul>
+            {% for pt in ['Apartment','Villa','Office','Shop','Land','Warehouse'] %}
+            <li><a href="{{ url_for('properties') }}?type={{ pt }}">{{ pt }}</a></li>
+            {% endfor %}
+            {% for link in footer_links %}
+            <li><a href="{{ link.url }}" target="{{ link.open_in }}">{{ link.name }}</a></li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Contact Us</h4>
+          <div class="contact-info">
+            <p><i class="fas fa-map-marker-alt"></i> {{ settings.address }}</p>
+            <p><i class="fas fa-phone"></i> <a href="tel:{{ settings.phone }}">{{ settings.phone }}</a></p>
+            <p><i class="fas fa-envelope"></i> <a href="mailto:{{ settings.email }}">{{ settings.email }}</a></p>
+          </div>
+          <a href="https://wa.me/{{ settings.whatsapp }}" target="_blank" class="whatsapp-btn">
+            <i class="fab fa-whatsapp"></i> WhatsApp Us
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container footer-bottom-inner">
+      <p>&copy; {{ now.year }} {{ settings.site_name }}. All Rights Reserved.</p>
+      <div class="footer-bottom-links">
+        <a href="/{{ settings.admin_path or 'admin' }}/login" class="admin-link">Admin</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- Floating Buttons -->
+<div class="floating-buttons">
+  <a href="https://wa.me/{{ settings.whatsapp }}" target="_blank" class="float-btn whatsapp-float" title="WhatsApp">
+    <i class="fab fa-whatsapp"></i>
+  </a>
+  <a href="tel:{{ settings.phone }}" class="float-btn call-float" title="Call Now">
+    <i class="fas fa-phone"></i>
+  </a>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% if settings.custom_js %}
+<script>{{ settings.custom_js|safe }}</script>
+{% endif %}
+{% block extra_js %}{% endblock %}
+</body>
+</html>

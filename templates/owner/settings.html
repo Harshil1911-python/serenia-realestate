@@ -1,0 +1,246 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}Site Settings{% endblock %}
+{% block page_title %}Site Settings{% endblock %}
+
+{% block content %}
+<!-- Live Preview Bar -->
+<div class="preview-bar" id="previewBar">
+  <div class="preview-bar-inner">
+    <span><i class="fas fa-eye"></i> Live Preview:</span>
+    <span class="preview-site-name" id="previewSiteName">{{ settings.site_name }}</span>
+    <div class="preview-color-dot" id="previewColor" style="background:{{ settings.primary_color or '#1a56db' }}"></div>
+    <span id="previewColorLabel">{{ settings.primary_color or '#1a56db' }}</span>
+    <a href="{{ url_for('index') }}" target="_blank" class="btn btn-xs btn-outline">Open Site <i class="fas fa-external-link-alt"></i></a>
+  </div>
+</div>
+
+<form method="POST" enctype="multipart/form-data" id="settingsForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="settings-tabs">
+    <button type="button" class="settings-tab active" onclick="showTab('general',this)"><i class="fas fa-cog"></i> General</button>
+    <button type="button" class="settings-tab" onclick="showTab('contact',this)"><i class="fas fa-phone"></i> Contact</button>
+    <button type="button" class="settings-tab" onclick="showTab('social',this)"><i class="fas fa-share-alt"></i> Social</button>
+    <button type="button" class="settings-tab" onclick="showTab('agent',this)"><i class="fas fa-user"></i> Agent</button>
+    <button type="button" class="settings-tab" onclick="showTab('seo',this)"><i class="fas fa-search"></i> SEO</button>
+    <button type="button" class="settings-tab" onclick="showTab('maps',this)"><i class="fas fa-map"></i> Map</button>
+  </div>
+
+  <!-- GENERAL -->
+  <div id="tab-general" class="settings-panel active">
+    <div class="card"><div class="card-header"><h3>General Settings</h3></div><div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Business / Site Name</label>
+          <input type="text" name="site_name" class="form-input" value="{{ settings.site_name }}" oninput="document.getElementById('previewSiteName').textContent=this.value" placeholder="My Real Estate">
+        </div>
+        <div class="form-group">
+          <label>Tagline</label>
+          <input type="text" name="tagline" class="form-input" value="{{ settings.tagline }}" placeholder="Find Your Dream Property">
+        </div>
+        <div class="form-group">
+          <label>Hero Title</label>
+          <input type="text" name="hero_title" class="form-input" value="{{ settings.hero_title }}">
+        </div>
+        <div class="form-group">
+          <label>Hero Subtitle</label>
+          <input type="text" name="hero_subtitle" class="form-input" value="{{ settings.hero_subtitle }}">
+        </div>
+        <div class="form-group">
+          <label>Logo (PNG/WEBP)</label>
+          <input type="file" name="logo" accept="image/*" class="form-input" onchange="previewFile(this,'logoPreview')">
+          {% if settings.logo %}<img id="logoPreview" src="{{ url_for('static',filename='uploads/profiles/'+settings.logo) }}" class="form-image-preview">
+          {% else %}<img id="logoPreview" src="" class="form-image-preview" style="display:none">{% endif %}
+        </div>
+        <div class="form-group">
+          <label>Favicon (.ico / .png)</label>
+          <input type="file" name="favicon" accept=".ico,image/*" class="form-input">
+          {% if settings.favicon %}<small style="color:#22c55e"><i class="fas fa-check"></i> Favicon set</small>{% endif %}
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- CONTACT -->
+  <div id="tab-contact" class="settings-panel">
+    <div class="card"><div class="card-header"><h3>Contact Details</h3></div><div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="text" name="phone" class="form-input" value="{{ settings.phone }}" placeholder="+91 98765 43210">
+        </div>
+        <div class="form-group">
+          <label>WhatsApp (country code, no +)</label>
+          <input type="text" name="whatsapp" class="form-input" value="{{ settings.whatsapp }}" placeholder="919876543210">
+        </div>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" name="email" class="form-input" value="{{ settings.email }}">
+        </div>
+        <div class="form-group form-col-2">
+          <label>Office Address</label>
+          <input type="text" name="address" class="form-input" value="{{ settings.address }}">
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- SOCIAL -->
+  <div id="tab-social" class="settings-panel">
+    <div class="card"><div class="card-header"><h3>Social Media</h3></div><div class="card-body">
+      <div class="form-grid">
+        {% for p,icon in [('facebook','fab fa-facebook'),('instagram','fab fa-instagram'),('twitter','fab fa-twitter'),('linkedin','fab fa-linkedin'),('youtube','fab fa-youtube')] %}
+        <div class="form-group">
+          <label><i class="{{ icon }}"></i> {{ p|title }}</label>
+          <input type="url" name="{{ p }}" class="form-input" value="{{ settings[p] }}" placeholder="https://{{ p }}.com/...">
+        </div>
+        {% endfor %}
+      </div>
+    </div></div>
+  </div>
+
+  <!-- AGENT -->
+  <div id="tab-agent" class="settings-panel">
+    <div class="card"><div class="card-header"><h3>Agent Profile</h3></div><div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" name="agent_name" class="form-input" value="{{ settings.agent_name }}">
+        </div>
+        <div class="form-group">
+          <label>Title / Designation</label>
+          <input type="text" name="agent_title" class="form-input" value="{{ settings.agent_title }}">
+        </div>
+        <div class="form-group form-col-2">
+          <label>Biography</label>
+          <textarea name="agent_bio" class="form-input" rows="4">{{ settings.agent_bio }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Experience</label>
+          <input type="text" name="agent_experience" class="form-input" value="{{ settings.agent_experience }}" placeholder="10+ Years">
+        </div>
+        <div class="form-group">
+          <label>Certifications</label>
+          <input type="text" name="agent_certifications" class="form-input" value="{{ settings.agent_certifications }}">
+        </div>
+        <div class="form-group">
+          <label>Languages Spoken</label>
+          <input type="text" name="agent_languages" class="form-input" value="{{ settings.agent_languages }}" placeholder="English, Hindi">
+        </div>
+        <div class="form-group">
+          <label>Agent WhatsApp</label>
+          <input type="text" name="agent_whatsapp" class="form-input" value="{{ settings.agent_whatsapp }}">
+        </div>
+        <div class="form-group">
+          <label>Profile Photo</label>
+          <input type="file" name="agent_photo" accept="image/*" class="form-input" onchange="previewFile(this,'agentPhotoPreview')">
+          {% if settings.agent_photo %}<img id="agentPhotoPreview" src="{{ url_for('static',filename='uploads/profiles/'+settings.agent_photo) }}" class="form-image-preview" style="border-radius:50%;width:80px;height:80px;object-fit:cover">
+          {% else %}<img id="agentPhotoPreview" src="" class="form-image-preview" style="display:none">{% endif %}
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- SEO -->
+  <div id="tab-seo" class="settings-panel">
+    <div class="card"><div class="card-header"><h3>SEO Settings</h3></div><div class="card-body">
+      <div class="form-group">
+        <label>Meta Title</label>
+        <input type="text" name="meta_title" class="form-input" value="{{ settings.meta_title }}">
+        <small class="form-hint">Appears in browser tab and search results</small>
+      </div>
+      <div class="form-group">
+        <label>Meta Description</label>
+        <textarea name="meta_description" class="form-input" rows="3">{{ settings.meta_description }}</textarea>
+        <small class="form-hint">150-160 characters recommended</small>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- MAP -->
+  <div id="tab-maps" class="settings-panel">
+    <div class="card"><div class="card-header"><h3>Map Settings (OpenStreetMap)</h3></div><div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Office Latitude</label>
+          <input type="text" name="map_lat" class="form-input" value="{{ settings.map_lat or '19.0760' }}" id="mapLat" placeholder="19.0760">
+        </div>
+        <div class="form-group">
+          <label>Office Longitude</label>
+          <input type="text" name="map_lng" class="form-input" value="{{ settings.map_lng or '72.8777' }}" id="mapLng" placeholder="72.8777">
+        </div>
+        <div class="form-group">
+          <label>Default Zoom Level (1-18)</label>
+          <input type="number" name="map_zoom" class="form-input" value="{{ settings.map_zoom or '13' }}" min="1" max="18">
+        </div>
+        <div class="form-group form-col-2">
+          <label>Legacy Google Maps Embed (optional)</label>
+          <textarea name="google_maps_embed" class="form-input" rows="3" placeholder="Paste Google Maps iframe embed code if needed">{{ settings.google_maps_embed }}</textarea>
+        </div>
+      </div>
+      <div style="margin-top:1rem">
+        <button type="button" class="btn btn-outline btn-sm" onclick="updatePreviewMap()"><i class="fas fa-map"></i> Preview Location</button>
+        <div id="settingsMap" style="height:300px;border-radius:12px;overflow:hidden;margin-top:1rem;display:none"></div>
+      </div>
+    </div></div>
+  </div>
+
+  <div style="position:sticky;bottom:0;background:white;border-top:1px solid #e2e8f0;padding:1rem 0;margin-top:1.5rem;z-index:10;">
+    <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Save All Settings</button>
+    <a href="{{ url_for('index') }}" target="_blank" class="btn btn-outline" style="margin-left:.75rem"><i class="fas fa-eye"></i> Preview Website</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+function previewFile(input, previewId) {
+  const preview = document.getElementById(previewId);
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => { preview.src = e.target.result; preview.style.display = 'block'; };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+let previewMap = null;
+function updatePreviewMap() {
+  const lat = parseFloat(document.getElementById('mapLat').value) || 19.076;
+  const lng = parseFloat(document.getElementById('mapLng').value) || 72.8777;
+  const mapDiv = document.getElementById('settingsMap');
+  mapDiv.style.display = 'block';
+  if (!previewMap) {
+    previewMap = L.map('settingsMap').setView([lat, lng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(previewMap);
+    L.marker([lat, lng]).addTo(previewMap).bindPopup('Your Office').openPopup();
+    // Allow click to set coords
+    previewMap.on('click', function(e) {
+      document.getElementById('mapLat').value = e.latlng.lat.toFixed(6);
+      document.getElementById('mapLng').value = e.latlng.lng.toFixed(6);
+      previewMap.eachLayer(l => { if (l instanceof L.Marker) previewMap.removeLayer(l); });
+      L.marker([e.latlng.lat, e.latlng.lng]).addTo(previewMap).bindPopup('Office Location').openPopup();
+    });
+  } else {
+    previewMap.setView([lat, lng], 13);
+    previewMap.eachLayer(l => { if (l instanceof L.Marker) previewMap.removeLayer(l); });
+    L.marker([lat, lng]).addTo(previewMap).bindPopup('Office Location').openPopup();
+    previewMap.invalidateSize();
+  }
+}
+
+// Unsaved changes warning
+let formChanged = false;
+document.getElementById('settingsForm').addEventListener('change', () => formChanged = true);
+document.getElementById('settingsForm').addEventListener('submit', () => formChanged = false);
+window.addEventListener('beforeunload', e => { if (formChanged) { e.preventDefault(); e.returnValue = ''; } });
+</script>
+{% endblock %}

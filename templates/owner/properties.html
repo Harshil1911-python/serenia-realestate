@@ -1,0 +1,70 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}Properties{% endblock %}
+{% block page_title %}Properties{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3>All Properties ({{ props.total }})</h3>
+    <a href="{{ url_for('add_property') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add Property</a>
+  </div>
+  <div class="card-body">
+    {% if props.items %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr><th>Image</th><th>Title</th><th>Type</th><th>Price</th><th>City</th><th>Status</th><th>Views</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for prop in props.items %}
+          <tr>
+            <td>
+              {% if prop.images %}
+                <img src="{{ url_for('static', filename='uploads/properties/' + prop.images[0].filename) }}" class="table-thumb" alt="">
+              {% else %}
+                <div class="table-thumb-placeholder"><i class="fas fa-image"></i></div>
+              {% endif %}
+            </td>
+            <td>
+              <div>
+                <strong>{{ prop.title[:35] }}</strong>
+                <small>{{ prop.property_id }}</small>
+              </div>
+            </td>
+            <td>{{ prop.property_type }}</td>
+            <td>
+              {% if prop.price >= 10000000 %}₹{{ "%.1f"|format(prop.price/10000000) }}Cr
+              {% elif prop.price >= 100000 %}₹{{ "%.1f"|format(prop.price/100000) }}L
+              {% else %}₹{{ "{:,.0f}".format(prop.price) }}{% endif %}
+            </td>
+            <td>{{ prop.city or '—' }}</td>
+            <td><span class="status-pill status-{{ prop.status }}">{{ prop.status|title }}</span></td>
+            <td>{{ prop.views }}</td>
+            <td>
+              <div class="action-buttons">
+                <a href="{{ url_for('property_detail', slug=prop.slug) }}" target="_blank" class="btn btn-xs btn-outline" title="View"><i class="fas fa-eye"></i></a>
+                <a href="{{ url_for('edit_property', pid=prop.id) }}" class="btn btn-xs btn-primary" title="Edit"><i class="fas fa-edit"></i></a>
+                <form method="POST" action="{{ url_for('delete_property', pid=prop.id) }}" style="display:inline" onsubmit="return confirm('Delete this property?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-xs btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if props.pages > 1 %}
+    <div class="pagination">
+      {% if props.has_prev %}<a href="{{ url_for('owner_properties', page=props.prev_num) }}" class="page-btn"><i class="fas fa-chevron-left"></i></a>{% endif %}
+      {% for p in props.iter_pages() %}{% if p %}<a href="{{ url_for('owner_properties', page=p) }}" class="page-btn {% if p == props.page %}active{% endif %}">{{ p }}</a>{% endif %}{% endfor %}
+      {% if props.has_next %}<a href="{{ url_for('owner_properties', page=props.next_num) }}" class="page-btn"><i class="fas fa-chevron-right"></i></a>{% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="empty-state"><i class="fas fa-home"></i><h3>No Properties</h3><p><a href="{{ url_for('add_property') }}" class="btn btn-primary">Add Your First Property</a></p></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

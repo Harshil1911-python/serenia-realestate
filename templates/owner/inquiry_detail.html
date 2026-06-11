@@ -1,0 +1,64 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}Inquiry #{{ inq.id }}{% endblock %}
+{% block page_title %}Inquiry Detail{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3>Inquiry from {{ inq.name }}</h3>
+    <a href="{{ url_for('owner_inquiries') }}" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back</a>
+  </div>
+  <div class="card-body">
+    <div class="inquiry-detail-grid">
+      <div class="inquiry-detail-main">
+        <div class="detail-section">
+          <h4>Contact Details</h4>
+          <div class="detail-rows">
+            <div class="detail-row"><span>Name</span><strong>{{ inq.name }}</strong></div>
+            <div class="detail-row"><span>Email</span><a href="mailto:{{ inq.email }}">{{ inq.email }}</a></div>
+            <div class="detail-row"><span>Phone</span>{% if inq.phone %}<a href="tel:{{ inq.phone }}">{{ inq.phone }}</a>{% else %}—{% endif %}</div>
+            <div class="detail-row"><span>Date</span>{{ inq.created_at.strftime('%B %d, %Y at %I:%M %p') }}</div>
+            <div class="detail-row"><span>Source</span>{{ inq.source }}</div>
+            <div class="detail-row"><span>IP</span>{{ inq.ip_address or '—' }}</div>
+            {% if inq.property %}
+            <div class="detail-row"><span>Property</span><a href="{{ url_for('property_detail', slug=inq.property.slug) }}" target="_blank">{{ inq.property.title }}</a></div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h4>Message</h4>
+          <div class="message-box">{{ inq.message }}</div>
+        </div>
+
+        {% if inq.reply %}
+        <div class="detail-section">
+          <h4>Your Reply <small>({{ inq.replied_at.strftime('%d %b %Y') }})</small></h4>
+          <div class="message-box reply-box">{{ inq.reply }}</div>
+        </div>
+        {% endif %}
+
+        <div class="detail-section">
+          <h4>{{ 'Update Reply' if inq.reply else 'Add Reply' }}</h4>
+          <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <textarea name="reply" class="form-input" rows="4" placeholder="Write your reply...">{{ inq.reply or '' }}</textarea>
+            <button type="submit" class="btn btn-primary" style="margin-top:.5rem;"><i class="fas fa-reply"></i> Save Reply</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="inquiry-detail-sidebar">
+        <div class="sidebar-card">
+          <h4>Quick Actions</h4>
+          <a href="mailto:{{ inq.email }}" class="btn btn-outline btn-block"><i class="fas fa-envelope"></i> Send Email</a>
+          {% if inq.phone %}
+          <a href="tel:{{ inq.phone }}" class="btn btn-outline btn-block" style="margin-top:.5rem;"><i class="fas fa-phone"></i> Call</a>
+          <a href="https://wa.me/{{ inq.phone|replace(' ','')|replace('+','') }}" target="_blank" class="btn btn-whatsapp btn-block" style="margin-top:.5rem;"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

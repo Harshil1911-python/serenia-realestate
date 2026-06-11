@@ -1,0 +1,58 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}Inquiries{% endblock %}
+{% block page_title %}Inquiries / Messages{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3><i class="fas fa-envelope" style="color:var(--primary)"></i> All Inquiries ({{ inqs.total }})</h3>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <a href="{{ url_for('owner_inquiries') }}?filter=unread" class="btn btn-outline btn-sm">Unread</a>
+      <a href="{{ url_for('owner_inquiries') }}" class="btn btn-outline btn-sm">All</a>
+      <a href="{{ url_for('export_inquiries') }}" class="btn btn-primary btn-sm"><i class="fas fa-download"></i> Export CSV</a>
+    </div>
+  </div>
+  <div class="card-body">
+    {% if inqs.items %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>NAME</th><th>EMAIL</th><th>PHONE</th><th>SUBJECT</th><th>PREVIEW</th><th>DATE</th><th>ACTIONS</th></tr></thead>
+        <tbody>
+          {% for inq in inqs.items %}
+          <tr class="{% if not inq.is_read %}row-unread{% endif %}">
+            <td>
+              <strong>{{ inq.name }}</strong>
+              {% if not inq.is_read %}<span class="badge badge-unread" style="font-size:.65rem;display:block;width:fit-content;margin-top:.2rem">NEW</span>{% endif %}
+            </td>
+            <td><a href="mailto:{{ inq.email }}">{{ inq.email }}</a></td>
+            <td>{% if inq.phone %}<a href="tel:{{ inq.phone }}">{{ inq.phone }}</a>{% else %}<span style="color:#94a3b8">—</span>{% endif %}</td>
+            <td>{{ inq.source or 'General' }}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b">{{ inq.message[:70] }}</td>
+            <td style="white-space:nowrap">{{ inq.created_at.strftime('%d %b %Y') }}</td>
+            <td>
+              <div class="action-buttons">
+                <a href="{{ url_for('view_inquiry', iid=inq.id) }}" class="btn btn-xs btn-primary"><i class="fas fa-eye"></i> View</a>
+                <a href="mailto:{{ inq.email }}" class="btn btn-xs btn-outline" title="Email"><i class="fas fa-reply"></i></a>
+                {% if inq.phone %}
+                <a href="https://wa.me/{{ inq.phone|replace(' ','')|replace('+','') }}" target="_blank" class="btn btn-xs btn-whatsapp" title="WhatsApp"><i class="fab fa-whatsapp"></i></a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if inqs.pages > 1 %}
+    <div class="pagination">
+      {% if inqs.has_prev %}<a href="{{ url_for('owner_inquiries', page=inqs.prev_num) }}" class="page-btn"><i class="fas fa-chevron-left"></i></a>{% endif %}
+      {% for p in inqs.iter_pages() %}{% if p %}<a href="{{ url_for('owner_inquiries', page=p) }}" class="page-btn {% if p==inqs.page %}active{% endif %}">{{ p }}</a>{% endif %}{% endfor %}
+      {% if inqs.has_next %}<a href="{{ url_for('owner_inquiries', page=inqs.next_num) }}" class="page-btn"><i class="fas fa-chevron-right"></i></a>{% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="empty-state"><i class="fas fa-envelope-open"></i><h3>No Inquiries Yet</h3><p>Messages from your website contact form and property inquiries will appear here.</p></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

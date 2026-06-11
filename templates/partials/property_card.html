@@ -1,0 +1,42 @@
+<div class="property-card" data-aos="fade-up">
+  <div class="prop-image-wrap">
+    <a href="{{ url_for('property_detail', slug=prop.slug) }}">
+      {% if prop.images %}
+        <img src="{{ url_for('static', filename='uploads/properties/' + prop.images[0].filename) }}" alt="{{ prop.title }}" loading="lazy" class="prop-img">
+      {% else %}
+        <div class="prop-img-placeholder"><i class="fas fa-image"></i></div>
+      {% endif %}
+    </a>
+    <div class="prop-badges">
+      <span class="badge badge-{{ prop.listing_type }}">{{ prop.listing_type|title }}</span>
+      <span class="badge badge-status-{{ prop.status }}">{{ prop.status|replace('_',' ')|title }}</span>
+    </div>
+    {% if prop.is_featured %}
+      <span class="featured-tag"><i class="fas fa-star"></i> Featured</span>
+    {% endif %}
+  </div>
+  <div class="prop-body">
+    <p class="prop-type">{{ prop.property_type }}</p>
+    <h3 class="prop-title"><a href="{{ url_for('property_detail', slug=prop.slug) }}">{{ prop.title }}</a></h3>
+    <p class="prop-location"><i class="fas fa-map-marker-alt"></i> {{ prop.city }}{% if prop.state %}, {{ prop.state }}{% endif %}</p>
+    <div class="prop-specs">
+      {% if prop.bedrooms %}<span><i class="fas fa-bed"></i> {{ prop.bedrooms }} Bed</span>{% endif %}
+      {% if prop.bathrooms %}<span><i class="fas fa-bath"></i> {{ prop.bathrooms }} Bath</span>{% endif %}
+      {% if prop.area %}<span><i class="fas fa-ruler-combined"></i> {{ prop.area|int }} {{ prop.area_unit }}</span>{% endif %}
+      {% if prop.parking %}<span><i class="fas fa-car"></i> {{ prop.parking }} Park</span>{% endif %}
+    </div>
+    <div class="prop-footer">
+      <div class="prop-price">
+        {% if prop.price >= 10000000 %}
+          ₹{{ "%.1f"|format(prop.price/10000000) }} Cr
+        {% elif prop.price >= 100000 %}
+          ₹{{ "%.1f"|format(prop.price/100000) }} L
+        {% else %}
+          ₹{{ "{:,.0f}".format(prop.price) }}
+        {% endif %}
+        {% if prop.price_unit == 'per_month' %}<span>/mo</span>{% elif prop.price_unit == 'per_sqft' %}<span>/sqft</span>{% endif %}
+      </div>
+      <a href="{{ url_for('property_detail', slug=prop.slug) }}" class="prop-btn">View Details</a>
+    </div>
+  </div>
+</div>

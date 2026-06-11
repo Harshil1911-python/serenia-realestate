@@ -1,0 +1,114 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}User Management{% endblock %}
+{% block page_title %}User Management{% endblock %}
+
+{% block content %}
+<div class="dashboard-grid">
+  <div class="card">
+    <div class="card-header"><h3>Create New User</h3></div>
+    <div class="card-body">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="create">
+        <div class="form-group">
+          <label>Username *</label>
+          <input type="text" name="username" required class="form-input" placeholder="newuser">
+        </div>
+        <div class="form-group">
+          <label>Email *</label>
+          <input type="email" name="email" required class="form-input" placeholder="user@example.com">
+        </div>
+        <div class="form-group">
+          <label>Password *</label>
+          <input type="password" name="password" required class="form-input" placeholder="Strong password">
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <select name="role" class="form-input">
+            <option value="owner">Owner</option>
+            <option value="developer">Developer</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create User</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>All Users ({{ users|length }})</h3></div>
+    <div class="card-body">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td>
+                <strong>{{ u.username }}</strong>
+                <small>{{ u.email }}</small>
+              </td>
+              <td><span class="badge badge-role-{{ u.role }}">{{ u.role|title }}</span></td>
+              <td><span class="badge {% if u.is_active %}badge-active{% else %}badge-inactive{% endif %}">{{ 'Active' if u.is_active else 'Locked' }}</span></td>
+              <td>{{ u.created_at.strftime('%d %b %Y') }}</td>
+              <td>
+                <div class="action-buttons">
+                  <!-- Toggle Active -->
+                  {% if u.id != current_user.id %}
+                  <form method="POST" style="display:inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="toggle">
+                    <input type="hidden" name="user_id" value="{{ u.id }}">
+                    <button type="submit" class="btn btn-xs btn-outline" title="{{ 'Deactivate' if u.is_active else 'Activate' }}">
+                      <i class="fas fa-{{ 'lock' if u.is_active else 'unlock' }}"></i>
+                    </button>
+                  </form>
+                  <!-- Reset Password -->
+                  <button class="btn btn-xs btn-primary" onclick="showResetForm({{ u.id }})" title="Reset Password">
+                    <i class="fas fa-key"></i>
+                  </button>
+                  <!-- Delete -->
+                  <form method="POST" style="display:inline" onsubmit="return confirm('Delete user {{ u.username }}?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="user_id" value="{{ u.id }}">
+                    <button type="submit" class="btn btn-xs btn-danger"><i class="fas fa-trash"></i></button>
+                  </form>
+                  {% else %}
+                  <span class="text-muted">(You)</span>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            <!-- Reset Password Row -->
+            <tr id="reset-form-{{ u.id }}" style="display:none; background:#f8f9fa;">
+              <td colspan="5">
+                <form method="POST" class="inline-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="action" value="reset_password">
+                  <input type="hidden" name="user_id" value="{{ u.id }}">
+                  <input type="password" name="new_password" required class="form-input form-input-sm" placeholder="New password for {{ u.username }}">
+                  <button type="submit" class="btn btn-sm btn-primary">Reset</button>
+                  <button type="button" class="btn btn-sm btn-outline" onclick="hideResetForm({{ u.id }})">Cancel</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showResetForm(id) {
+  document.querySelectorAll('[id^="reset-form-"]').forEach(r => r.style.display='none');
+  document.getElementById('reset-form-' + id).style.display = 'table-row';
+}
+function hideResetForm(id) {
+  document.getElementById('reset-form-' + id).style.display = 'none';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block page_title %}Analytics Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-grid" style="margin-bottom:1.5rem">
+  <div class="card">
+    <div class="card-header"><h3><i class="fas fa-chart-area" style="color:var(--primary)"></i> Daily Visits — Last 30 Days</h3></div>
+    <div class="card-body"><div class="chart-wrap"><canvas id="visitsChart" height="120"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h3><i class="fas fa-envelope" style="color:var(--primary)"></i> Top Pages</h3></div>
+    <div class="card-body">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Page</th><th>Visits</th></tr></thead>
+          <tbody>
+            {% for page, count in top_pages %}
+            <tr><td>/{{ page }}</td><td><strong>{{ count }}</strong></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h3><i class="fas fa-fire" style="color:var(--accent)"></i> Most Viewed Properties</h3></div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Property</th><th>Type</th><th>City</th><th>Views</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for p in top_props %}
+          <tr>
+            <td><a href="{{ url_for('property_detail', slug=p.slug) }}" target="_blank"><strong>{{ p.title[:40] }}</strong></a></td>
+            <td>{{ p.property_type }}</td>
+            <td>{{ p.city or '—' }}</td>
+            <td><strong>{{ p.views }}</strong></td>
+            <td><span class="status-pill status-{{ p.status }}">{{ p.status|title }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+const labels = {{ daily | map(attribute=0) | list | tojson }};
+const data   = {{ daily | map(attribute=1) | list | tojson }};
+new Chart(document.getElementById('visitsChart'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'Page Visits',
+      data: data,
+      borderColor: getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#1a56db',
+      backgroundColor: 'rgba(26,86,219,0.08)',
+      tension: 0.4, fill: true, pointRadius: 4, pointBackgroundColor: '#1a56db'
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+  }
+});
+</script>
+{% endblock %}

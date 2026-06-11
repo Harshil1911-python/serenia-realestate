@@ -1,0 +1,63 @@
+{% extends "partials/admin_base.html" %}
+{% block title %}Database{% endblock %}
+{% block page_title %}Database Overview{% endblock %}
+{% block content %}
+<div class="stats-grid">
+  {% for table, count in stats.items() %}
+  <div class="stat-card stat-blue">
+    <div class="stat-icon"><i class="fas fa-table"></i></div>
+    <div class="stat-info"><h3>{{ count }}</h3><p>{{ table|replace('_',' ')|title }}</p></div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Backup & Restore -->
+<div class="dashboard-grid">
+  <div class="card">
+    <div class="card-header"><h3><i class="fas fa-download"></i> Create Backup</h3></div>
+    <div class="card-body">
+      <p style="color:#64748b;margin-bottom:1.5rem">Creates a full backup ZIP including database (JSON) and all uploaded media files.</p>
+      <a href="{{ url_for('create_backup') }}" class="btn btn-primary">
+        <i class="fas fa-download"></i> Download Full Backup
+      </a>
+      <p style="font-size:.8rem;color:#94a3b8;margin-top:.75rem">Includes: settings, properties, inquiries, blog, testimonials, FAQs, external links, and all uploaded images/files.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3><i class="fas fa-upload"></i> Restore Backup</h3></div>
+    <div class="card-body">
+      <p style="color:#64748b;margin-bottom:1rem">Upload a previously created backup .zip file to restore settings, testimonials, FAQs, and media.</p>
+      <form method="POST" action="{{ url_for('restore_backup') }}" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+          <label>Backup ZIP File</label>
+          <input type="file" name="backup_file" accept=".zip" required class="form-input">
+        </div>
+        <button type="submit" class="btn btn-primary" onclick="return confirm('Restore this backup? This will overwrite current settings, testimonials, and FAQs.')">
+          <i class="fas fa-upload"></i> Restore Backup
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Danger Zone -->
+<div class="card">
+  <div class="card-header"><h3 style="color:#ef4444"><i class="fas fa-exclamation-triangle"></i> Danger Zone</h3></div>
+  <div class="card-body">
+    <div class="danger-zone">
+      <div class="danger-item">
+        <div>
+          <h4>Clear Activity & Visit Logs</h4>
+          <p>Removes all activity logs and page visit records. Cannot be undone.</p>
+        </div>
+        <form method="POST" action="{{ url_for('clear_logs') }}" onsubmit="return confirm('Clear ALL logs? Cannot be undone.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> Clear Logs</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
