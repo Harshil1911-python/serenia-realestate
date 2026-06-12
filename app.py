@@ -1250,9 +1250,44 @@ def e403(e): return render_template('public/403.html'),403
 def e500(e): return render_template('public/500.html'),500
 
 # ── INIT DB ──────────────────────────────────────────────────────────
+
+def run_auto_migrations():
+    """Safely add any missing columns to existing tables (lightweight migration
+    for deployments where db.create_all() doesn't alter existing tables)."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    existing_tables = inspector.get_table_names()
+
+    # Map of table -> {column_name: SQL column definition}
+    column_specs = {
+        'properties': {
+            'brochure_auto': 'BOOLEAN DEFAULT 0',
+            'public_link_enabled': 'BOOLEAN DEFAULT 1',
+        },
+        'users': {
+            'totp_secret': 'VARCHAR(32)',
+            'two_fa_enabled': 'BOOLEAN DEFAULT 0',
+        },
+    }
+
+    with db.engine.connect() as conn:
+        for table, columns in column_specs.items():
+            if table not in existing_tables:
+                continue
+            existing_cols = {c['name'] for c in inspector.get_columns(table)}
+            for col_name, col_def in columns.items():
+                if col_name not in existing_cols:
+                    try:
+                        conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col_name} {col_def}'))
+                        conn.commit()
+                    except Exception as e:
+                        print(f"Migration warning: could not add {table}.{col_name}: {e}")
+
 def init_db():
     with app.app_context():
         db.create_all()
+        run_auto_migrations()
         if not User.query.filter_by(role='developer').first():
             u=User(username='developer',email='dev@luxerealty.com',role='developer'); u.set_password('Dev@123456'); db.session.add(u)
         if not User.query.filter_by(role='owner').first():
@@ -1268,6 +1303,11 @@ def login_redirect():
     s = get_settings()
     return redirect(url_for('login', login_path=s.get('admin_path','admin')))
 
-if __name__=='__main__':
+# Run DB setup/migrations at import time so gunicorn workers also initialize the DB
+try:
     init_db()
+except Exception as e:
+    print(f"DB init warning: {e}")
+
+if __name__=='__main__':
     app.run(debug=True)
