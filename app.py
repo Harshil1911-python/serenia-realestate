@@ -34,6 +34,14 @@ app.config['MAX_CONTENT_LENGTH'] = 52 * 1024 * 1024
 app.config['WTF_CSRF_ENABLED'] = True
 app.config['WTF_CSRF_TIME_LIMIT'] = None  # no expiry
 
+IS_SQLITE = db_url.startswith('sqlite')
+if IS_SQLITE:
+    # Increase busy timeout so concurrent gunicorn workers wait instead of
+    # immediately raising "database is locked" errors.
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'connect_args': {'timeout': 30}
+    }
+
 ALLOWED_IMG = {'jpg','jpeg','png','webp','gif'}
 ALLOWED_VIDEO = {'mp4','mov','webm'}
 ALLOWED_ALL = {'jpg','jpeg','png','webp','gif','mp4','mov','webm','pdf','docx'}
@@ -60,6 +68,35 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login_redirect'
 login_manager.login_message_category = 'info'
 login_manager.login_message = 'Please log in to access this page.'
+
+if IS_SQLITE:
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
+
+    @event.listens_for(Engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):
+        """Enable WAL mode + busy timeout so multiple gunicorn workers can
+        read/write the SQLite file concurrently without 'database is locked'
+        errors causing broken sessions and intermittent 500/404/CSS issues."""
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+        finally:
+            cursor.close()
+
+@app.teardown_request
+def _cleanup_session(exception=None):
+    """Ensure any failed transaction is rolled back at the end of every
+    request so the next request on this worker starts with a clean session."""
+    if exception is not None:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+    db.session.remove()
+
 limiter = Limiter(key_func=get_remote_address, app=app,
                   default_limits=["500 per day", "100 per hour"],
                   storage_uri="memory://")
@@ -103,7 +140,8 @@ def log_activity(action, details=None):
             user_id=current_user.id if current_user.is_authenticated else None,
             action=action, details=details, ip_address=request.remote_addr))
         db.session.commit()
-    except Exception: pass
+    except Exception:
+        db.session.rollback()
 
 def owner_required(f):
     @wraps(f)
@@ -156,8 +194,18 @@ def set_settings(data: dict):
 
 @app.context_processor
 def inject_globals():
-    s = get_settings()
-    ext = ExternalLink.query.filter_by(is_active=True).order_by(ExternalLink.sort_order).all()
+    try:
+        s = get_settings()
+        ext = ExternalLink.query.filter_by(is_active=True).order_by(ExternalLink.sort_order).all()
+    except Exception:
+        db.session.rollback()
+        try:
+            s = get_settings()
+            ext = ExternalLink.query.filter_by(is_active=True).order_by(ExternalLink.sort_order).all()
+        except Exception:
+            db.session.rollback()
+            s = dict(SETTING_DEFAULTS)
+            ext = []
     return dict(
         settings=s, now=datetime.utcnow(),
         header_links=[l for l in ext if l.link_type=='header_nav'],
@@ -171,7 +219,8 @@ def track(page):
         db.session.add(PageVisit(page=page, ip_address=request.remote_addr,
                                   user_agent=(request.user_agent.string or '')[:300]))
         db.session.commit()
-    except Exception: pass
+    except Exception:
+        db.session.rollback()
 
 def clean(s, tags=None):
     allowed = tags or []
