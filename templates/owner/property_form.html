@@ -6,7 +6,12 @@
 <div class="card">
   <div class="card-header">
     <h3>{{ action }} Property</h3>
-    <a href="{{ url_for('owner_properties') }}" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back</a>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      {% if prop %}
+      <a href="{{ url_for('property_detail', slug=prop.slug) }}" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-eye"></i> View Live</a>
+      {% endif %}
+      <a href="{{ url_for('owner_properties') }}" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back</a>
+    </div>
   </div>
   <div class="card-body">
     <form method="POST" enctype="multipart/form-data" class="property-form" id="propertyForm">
@@ -14,7 +19,7 @@
 
       <!-- Basic Info -->
       <div class="form-section">
-        <h4 class="form-section-title">Basic Information</h4>
+        <h4 class="form-section-title"><i class="fas fa-info-circle"></i> Basic Information</h4>
         <div class="form-grid">
           <div class="form-group form-col-2">
             <label>Property Title *</label>
@@ -43,12 +48,18 @@
               {% endfor %}
             </select>
           </div>
+          {% if prop %}
+          <div class="form-group">
+            <label>Property ID</label>
+            <input type="text" class="form-input" value="{{ prop.property_id }}" disabled style="background:#f1f5f9">
+          </div>
+          {% endif %}
         </div>
       </div>
 
       <!-- Pricing -->
       <div class="form-section">
-        <h4 class="form-section-title">Pricing & Size</h4>
+        <h4 class="form-section-title"><i class="fas fa-rupee-sign"></i> Pricing & Size</h4>
         <div class="form-grid">
           <div class="form-group">
             <label>Price (₹) *</label>
@@ -80,7 +91,7 @@
 
       <!-- Specifications -->
       <div class="form-section">
-        <h4 class="form-section-title">Specifications</h4>
+        <h4 class="form-section-title"><i class="fas fa-ruler-combined"></i> Specifications</h4>
         <div class="form-grid">
           <div class="form-group">
             <label>Bedrooms</label>
@@ -110,13 +121,13 @@
         </div>
       </div>
 
-      <!-- Location -->
+      <!-- Location with Drag & Drop Map -->
       <div class="form-section">
-        <h4 class="form-section-title">Location</h4>
+        <h4 class="form-section-title"><i class="fas fa-map-marker-alt"></i> Location</h4>
         <div class="form-grid">
           <div class="form-group form-col-2">
             <label>Full Address</label>
-            <input type="text" name="address" class="form-input" value="{{ prop.address if prop else '' }}" placeholder="Flat 301, Sunshine Apartments, Park Street">
+            <input type="text" name="address" id="addressInput" class="form-input" value="{{ prop.address if prop else '' }}" placeholder="Flat 301, Sunshine Apartments, Park Street">
           </div>
           <div class="form-group">
             <label>City</label>
@@ -131,56 +142,140 @@
             <input type="text" name="pincode" class="form-input" value="{{ prop.pincode if prop else '' }}" placeholder="400001">
           </div>
           <div class="form-group">
-            <label>Google Maps Embed Code</label>
-            <textarea name="google_map_link" class="form-input" rows="3" placeholder="Paste Google Maps embed iframe code here">{{ prop.google_map_link if prop else '' }}</textarea>
+            <label>Latitude</label>
+            <input type="text" name="latitude" id="latInput" class="form-input" value="{{ prop.latitude if prop and prop.latitude else '' }}" placeholder="19.0760">
           </div>
+          <div class="form-group">
+            <label>Longitude</label>
+            <input type="text" name="longitude" id="lngInput" class="form-input" value="{{ prop.longitude if prop and prop.longitude else '' }}" placeholder="72.8777">
+          </div>
+        </div>
+
+        <!-- Drag & Drop Map Picker -->
+        <div class="map-picker-wrap">
+          <div class="map-picker-header">
+            <span><i class="fas fa-map-pin"></i> Drag the marker to set exact property location</span>
+            <div style="display:flex;gap:.5rem">
+              <input type="text" id="mapSearchInput" class="form-input form-input-sm" placeholder="Search location..." style="width:200px">
+              <button type="button" class="btn btn-xs btn-outline" onclick="searchMapLocation()"><i class="fas fa-search"></i> Find</button>
+              <button type="button" class="btn btn-xs btn-outline" onclick="useMyLocation()"><i class="fas fa-location-arrow"></i> My Location</button>
+            </div>
+          </div>
+          <div id="propertyLocationMap" style="height:340px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border)"></div>
+          <small class="form-hint">Click anywhere on the map or drag the marker pin to set the exact property location. Coordinates update automatically.</small>
+        </div>
+
+        <div class="form-group" style="margin-top:1rem">
+          <label>Legacy Google Maps Embed (optional)</label>
+          <textarea name="google_map_link" class="form-input" rows="2" placeholder="Paste Google Maps embed iframe code here (optional - OpenStreetMap above is used by default)">{{ prop.google_map_link if prop else '' }}</textarea>
         </div>
       </div>
 
       <!-- Description -->
       <div class="form-section">
-        <h4 class="form-section-title">Description</h4>
+        <h4 class="form-section-title"><i class="fas fa-align-left"></i> Description</h4>
         <div class="form-group">
           <textarea name="description" class="form-input" rows="6" placeholder="Describe the property in detail...">{{ prop.description if prop else '' }}</textarea>
         </div>
       </div>
 
-      <!-- Media -->
+      <!-- Images -->
       <div class="form-section">
-        <h4 class="form-section-title">Media</h4>
-        <div class="form-grid">
+        <h4 class="form-section-title"><i class="fas fa-images"></i> Property Images</h4>
+        <div class="form-group">
+          <label>Upload Images (JPG, PNG, WEBP) — Drag & drop or click</label>
+          <div class="upload-zone" id="uploadZone">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <p>Drag & drop or click to upload images</p>
+            <input type="file" name="images[]" multiple accept="image/*" id="imageInput" class="file-input-hidden">
+          </div>
+          <div id="imagePreview" class="image-preview-grid">
+            {% if prop %}
+              {% for img in prop.images %}
+              <div class="img-preview-item" data-img-id="{{ img.id }}">
+                <img src="{{ url_for('static', filename='uploads/properties/' + img.filename) }}" alt="">
+                {% if img.is_primary %}<span class="img-primary-badge">Main</span>{% endif %}
+                <button type="button" class="img-delete-btn" onclick="deleteImage({{ img.id }}, this)"><i class="fas fa-times"></i></button>
+              </div>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Videos -->
+      <div class="form-section">
+        <h4 class="form-section-title"><i class="fas fa-video"></i> Videos</h4>
+
+        {% if prop and prop.videos %}
+        <div class="existing-videos-list">
+          <label>Existing Videos</label>
+          {% for v in prop.videos %}
+          <div class="video-item-row">
+            <i class="fas fa-{{ 'youtube' if v.video_type=='youtube' else 'file-video' }}" style="color:{{ '#ff0000' if v.video_type=='youtube' else 'var(--primary)' }}"></i>
+            <span class="video-item-label">
+              {% if v.video_type == 'youtube' %}{{ v.url }}{% else %}{{ v.filename }} (uploaded){% endif %}
+            </span>
+            <button type="button" class="btn btn-xs btn-danger" onclick="deleteVideo({{ v.id }}, this)"><i class="fas fa-times"></i></button>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="form-grid" style="margin-top:1rem">
           <div class="form-group form-col-2">
-            <label>Property Images (JPG, PNG, WEBP)</label>
-            <div class="upload-zone" id="uploadZone">
-              <i class="fas fa-cloud-upload-alt"></i>
-              <p>Drag & drop or click to upload images</p>
-              <input type="file" name="images[]" multiple accept="image/*" id="imageInput" class="file-input-hidden">
+            <label>YouTube / Vimeo Links</label>
+            <div id="youtubeLinksBuilder">
+              <div class="amenity-input-row">
+                <input type="url" name="youtube_links[]" class="form-input" placeholder="https://www.youtube.com/watch?v=...">
+                <button type="button" class="btn btn-xs btn-danger" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+              </div>
             </div>
-            <div id="imagePreview" class="image-preview-grid">
-              {% if prop %}
-                {% for img in prop.images %}
-                <div class="img-preview-item" data-img-id="{{ img.id }}">
-                  <img src="{{ url_for('static', filename='uploads/properties/' + img.filename) }}" alt="">
-                  <button type="button" class="img-delete-btn" onclick="deleteImage({{ img.id }}, this)"><i class="fas fa-times"></i></button>
-                </div>
-                {% endfor %}
-              {% endif %}
-            </div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="addYoutubeLink()" style="margin-top:.5rem"><i class="fas fa-plus"></i> Add Another Video Link</button>
+            <small class="form-hint">Paste full YouTube or Vimeo URLs — they'll be auto-converted to embeds.</small>
           </div>
-          <div class="form-group">
-            <label>Video URL (YouTube/Vimeo embed)</label>
-            <input type="url" name="video_url" class="form-input" value="{{ prop.video_url if prop else '' }}" placeholder="https://www.youtube.com/embed/...">
+          <div class="form-group form-col-2">
+            <label>Upload Video Files (MP4, MOV, WEBM — max 50MB each)</label>
+            <input type="file" name="video_files[]" accept="video/mp4,video/quicktime,video/webm" multiple class="form-input">
           </div>
+        </div>
+      </div>
+
+      <!-- Brochure -->
+      <div class="form-section">
+        <h4 class="form-section-title"><i class="fas fa-file-pdf"></i> Brochure</h4>
+        <div class="form-grid">
           <div class="form-group">
-            <label>Brochure (PDF/DOCX)</label>
+            <label>Upload Custom Brochure (PDF/DOCX)</label>
             <input type="file" name="brochure" accept=".pdf,.docx" class="form-input">
+            {% if prop and prop.brochure_path %}
+            <small class="form-hint" style="color:#22c55e">
+              <i class="fas fa-check-circle"></i> Current: {{ prop.brochure_path }}
+              {% if prop.brochure_auto %}<span class="badge" style="background:#dbeafe;color:#1e40af">Auto-Generated</span>{% endif %}
+              — <a href="{{ url_for('static', filename='uploads/documents/' + prop.brochure_path) }}" target="_blank">View</a>
+            </small>
+            {% endif %}
+          </div>
+          <div class="form-group" style="display:flex;flex-direction:column;justify-content:center">
+            <label class="checkbox-label" style="margin-bottom:.5rem">
+              <input type="checkbox" name="auto_brochure" value="1" {% if prop and not prop.brochure_path %}checked{% endif %}>
+              <span><i class="fas fa-magic"></i> Auto-generate PDF brochure from property details</span>
+            </label>
+            {% if prop %}
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('regenForm').submit()">
+              <i class="fas fa-sync"></i> Regenerate Brochure Now
+            </button>
+            <form id="regenForm" method="POST" action="{{ url_for('generate_brochure', pid=prop.id) }}" style="display:none">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            </form>
+            {% endif %}
           </div>
         </div>
       </div>
 
       <!-- Amenities -->
       <div class="form-section">
-        <h4 class="form-section-title">Amenities</h4>
+        <h4 class="form-section-title"><i class="fas fa-star"></i> Amenities</h4>
         <div class="amenities-builder" id="amenitiesBuilder">
           {% if prop and prop.amenities %}
             {% for amenity in prop.amenities %}
@@ -199,11 +294,21 @@
           {% endif %}
         </div>
         <button type="button" class="btn btn-outline btn-sm" onclick="addAmenity()"><i class="fas fa-plus"></i> Add Amenity</button>
+
+        <!-- Quick amenity chips -->
+        <div style="margin-top:.75rem">
+          <small class="form-hint">Quick add:</small>
+          <div class="quick-chips">
+            {% for a in ['Club House','Garden','Children Play Area','Pet Friendly','Gas Pipeline','24x7 Water','CCTV','Intercom','Fire Safety','Rain Water Harvesting','Solar Panels','Modular Kitchen'] %}
+            <button type="button" class="quick-chip" onclick="addAmenity('{{ a }}')">+ {{ a }}</button>
+            {% endfor %}
+          </div>
+        </div>
       </div>
 
       <!-- SEO -->
       <div class="form-section">
-        <h4 class="form-section-title">SEO Settings</h4>
+        <h4 class="form-section-title"><i class="fas fa-search"></i> SEO Settings</h4>
         <div class="form-group">
           <label>Meta Title</label>
           <input type="text" name="meta_title" class="form-input" value="{{ prop.meta_title if prop else '' }}" placeholder="SEO Title for this property">
@@ -216,26 +321,61 @@
 
       <!-- Options -->
       <div class="form-section">
-        <label class="checkbox-label">
-          <input type="checkbox" name="is_featured" {% if prop and prop.is_featured %}checked{% endif %}>
-          <span>Mark as Featured Property</span>
-        </label>
+        <div class="form-grid">
+          <label class="checkbox-label">
+            <input type="checkbox" name="is_featured" {% if prop and prop.is_featured %}checked{% endif %}>
+            <span><i class="fas fa-star" style="color:var(--accent)"></i> Mark as Featured Property</span>
+          </label>
+        </div>
       </div>
 
-      <div class="form-actions">
-        <button type="submit" class="btn btn-primary">
+      <div class="form-actions" style="position:sticky;bottom:0;background:white;padding:1rem 0;border-top:1px solid var(--border);z-index:5">
+        <button type="submit" class="btn btn-primary btn-lg">
           <i class="fas fa-save"></i> {{ action }} Property
         </button>
         <a href="{{ url_for('owner_properties') }}" class="btn btn-outline">Cancel</a>
+        {% if prop %}
+        <a href="{{ url_for('property_detail', slug=prop.slug) }}" target="_blank" class="btn btn-outline"><i class="fas fa-external-link-alt"></i> Preview</a>
+        {% endif %}
       </div>
     </form>
+
+    {% if prop %}
+    <!-- Private Notes -->
+    <div class="form-section" style="margin-top:2rem">
+      <h4 class="form-section-title"><i class="fas fa-sticky-note"></i> Private Notes (not visible to public)</h4>
+      {% if prop.notes %}
+      <div class="property-notes-list">
+        {% for note in prop.notes %}
+        <div class="property-note-item">
+          <p>{{ note.content }}</p>
+          <div class="note-meta">
+            <small>{{ note.created_at.strftime('%d %b %Y %H:%M') }}</small>
+            <form method="POST" action="{{ url_for('delete_property_note', nid=note.id) }}" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-xs btn-danger"><i class="fas fa-trash"></i></button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <form method="POST" action="{{ url_for('add_property_note', pid=prop.id) }}" style="margin-top:.75rem;display:flex;gap:.5rem">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="text" name="content" class="form-input" placeholder="Add a private note (negotiation status, owner contact, etc.)">
+        <button type="submit" class="btn btn-outline btn-sm">Add Note</button>
+      </form>
+    </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// Image upload zone
+// ── IMAGE UPLOAD ──
 const uploadZone = document.getElementById('uploadZone');
 const imageInput = document.getElementById('imageInput');
 const preview = document.getElementById('imagePreview');
@@ -277,11 +417,105 @@ async function deleteImage(imgId, btn) {
   if (data.success) btn.closest('.img-preview-item').remove();
 }
 
-function addAmenity() {
+async function deleteVideo(vidId, btn) {
+  if (!confirm('Delete this video?')) return;
+  const res = await fetch(`/owner/property/video/${vidId}/delete`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json'}
+  });
+  const data = await res.json();
+  if (data.success) btn.closest('.video-item-row').remove();
+}
+
+// ── AMENITIES ──
+function addAmenity(value) {
   const row = document.createElement('div');
   row.className = 'amenity-input-row';
-  row.innerHTML = `<input type="text" name="amenities[]" class="form-input" placeholder="Amenity name"><button type="button" class="btn btn-xs btn-danger" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;
+  row.innerHTML = `<input type="text" name="amenities[]" class="form-input" value="${value||''}" placeholder="Amenity name"><button type="button" class="btn btn-xs btn-danger" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;
   document.getElementById('amenitiesBuilder').appendChild(row);
+}
+
+// ── YOUTUBE LINKS ──
+function addYoutubeLink() {
+  const row = document.createElement('div');
+  row.className = 'amenity-input-row';
+  row.innerHTML = `<input type="url" name="youtube_links[]" class="form-input" placeholder="https://www.youtube.com/watch?v=..."><button type="button" class="btn btn-xs btn-danger" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;
+  document.getElementById('youtubeLinksBuilder').appendChild(row);
+}
+
+// ── DRAG & DROP LOCATION MAP ──
+const initLat = parseFloat(document.getElementById('latInput').value) || parseFloat("{{ settings.map_lat or '19.0760' }}");
+const initLng = parseFloat(document.getElementById('lngInput').value) || parseFloat("{{ settings.map_lng or '72.8777' }}");
+
+const propMap = L.map('propertyLocationMap').setView([initLat, initLng], 14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+}).addTo(propMap);
+
+const marker = L.marker([initLat, initLng], {draggable: true}).addTo(propMap);
+
+function updateCoords(lat, lng) {
+  document.getElementById('latInput').value = lat.toFixed(6);
+  document.getElementById('lngInput').value = lng.toFixed(6);
+}
+
+marker.on('dragend', function(e) {
+  const pos = marker.getLatLng();
+  updateCoords(pos.lat, pos.lng);
+});
+
+propMap.on('click', function(e) {
+  marker.setLatLng(e.latlng);
+  updateCoords(e.latlng.lat, e.latlng.lng);
+});
+
+// Manual lat/lng input updates marker too
+document.getElementById('latInput').addEventListener('change', syncMarkerFromInputs);
+document.getElementById('lngInput').addEventListener('change', syncMarkerFromInputs);
+function syncMarkerFromInputs() {
+  const lat = parseFloat(document.getElementById('latInput').value);
+  const lng = parseFloat(document.getElementById('lngInput').value);
+  if (!isNaN(lat) && !isNaN(lng)) {
+    marker.setLatLng([lat, lng]);
+    propMap.setView([lat, lng], propMap.getZoom());
+  }
+}
+
+// Search location using Nominatim (OpenStreetMap geocoder)
+async function searchMapLocation() {
+  const q = document.getElementById('mapSearchInput').value;
+  if (!q) return;
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`);
+    const data = await res.json();
+    if (data && data.length > 0) {
+      const lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
+      marker.setLatLng([lat, lng]);
+      propMap.setView([lat, lng], 15);
+      updateCoords(lat, lng);
+      if (!document.getElementById('addressInput').value) {
+        document.getElementById('addressInput').value = data[0].display_name;
+      }
+    } else {
+      alert('Location not found. Try a different search term.');
+    }
+  } catch(e) {
+    alert('Search failed. Please try entering coordinates manually.');
+  }
+}
+document.getElementById('mapSearchInput').addEventListener('keypress', e => {
+  if (e.key === 'Enter') { e.preventDefault(); searchMapLocation(); }
+});
+
+// Use browser geolocation
+function useMyLocation() {
+  if (!navigator.geolocation) { alert('Geolocation not supported by your browser.'); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    marker.setLatLng([lat, lng]);
+    propMap.setView([lat, lng], 15);
+    updateCoords(lat, lng);
+  }, () => alert('Unable to retrieve your location.'));
 }
 </script>
 {% endblock %}

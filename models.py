@@ -87,15 +87,30 @@ class Property(db.Model):
     is_latest = db.Column(db.Boolean, default=True)
     views = db.Column(db.Integer, default=0)
     brochure_path = db.Column(db.String(300), nullable=True)
-    video_url = db.Column(db.String(300), nullable=True)
+    brochure_auto = db.Column(db.Boolean, default=False)  # whether brochure was auto-generated
+    video_url = db.Column(db.String(300), nullable=True)  # YouTube/Vimeo embed link
     meta_title = db.Column(db.String(200), nullable=True)
     meta_description = db.Column(db.String(400), nullable=True)
+    public_link_enabled = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     images = db.relationship('PropertyImage', backref='property', lazy=True, cascade='all, delete-orphan')
+    videos = db.relationship('PropertyVideo', backref='property', lazy=True, cascade='all, delete-orphan')
     amenities = db.relationship('PropertyAmenity', backref='property', lazy=True, cascade='all, delete-orphan')
     inquiries = db.relationship('Inquiry', backref='property', lazy=True)
+
+
+class PropertyVideo(db.Model):
+    __tablename__ = 'property_videos'
+    id = db.Column(db.Integer, primary_key=True)
+    property_id = db.Column(db.Integer, db.ForeignKey('properties.id'), nullable=False)
+    video_type = db.Column(db.String(20), default='youtube')  # youtube, upload
+    url = db.Column(db.String(500), nullable=True)       # youtube/vimeo link
+    filename = db.Column(db.String(200), nullable=True)  # uploaded video filename
+    title = db.Column(db.String(200), nullable=True)
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class PropertyImage(db.Model):
@@ -205,5 +220,32 @@ class ExternalLink(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-# Ensure ExternalLink model is complete
-# (already defined above - this is a check placeholder)
+class Task(db.Model):
+    """Owner to-do / task list widget"""
+    __tablename__ = 'tasks'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(300), nullable=False)
+    is_done = db.Column(db.Boolean, default=False)
+    priority = db.Column(db.String(10), default='normal')  # low, normal, high
+    due_date = db.Column(db.Date, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Note(db.Model):
+    """Quick sticky notes for owner dashboard"""
+    __tablename__ = 'notes'
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.Text, nullable=False)
+    color = db.Column(db.String(20), default='yellow')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class PropertyNote(db.Model):
+    """Private owner notes attached to a property (not shown publicly)"""
+    __tablename__ = 'property_notes'
+    id = db.Column(db.Integer, primary_key=True)
+    property_id = db.Column(db.Integer, db.ForeignKey('properties.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    property = db.relationship('Property', backref='notes')

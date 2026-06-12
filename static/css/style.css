@@ -515,3 +515,14 @@ textarea.form-input { resize: vertical; min-height: 100px; }
   .contact-card { padding: 1rem; }
   .contact-card-icon { width: 44px; height: 44px; font-size: 1.1rem; }
 }
+
+/* ── VIDEO GALLERY ── */
+.video-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+.video-gallery .video-wrap { aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; }
+.video-gallery .video-wrap iframe, .video-gallery .video-wrap video { width: 100%; height: 100%; border: none; }
+
+/* ── MAP ACTIONS ── */
+.map-actions { display: flex; gap: .625rem; margin-top: .875rem; flex-wrap: wrap; }
+
+/* ── INQUIRY MORE STYLES ── */
+.inquiry-card h3 i { margin-right: .35rem; }

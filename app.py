@@ -1,8 +1,8 @@
-import os, uuid, csv, io, json, zipfile, shutil
-from datetime import datetime, timedelta
+import os, uuid, csv, io, json, zipfile, shutil, re
+from datetime import datetime, timedelta, date
 from functools import wraps
 from flask import (Flask, render_template, redirect, url_for, flash,
-                   request, jsonify, send_file, abort, session, Response)
+                   request, jsonify, send_file, abort, session, Response, send_from_directory)
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect, generate_csrf
@@ -16,7 +16,9 @@ import bleach
 
 load_dotenv()
 
-from models import db, User, Property, PropertyImage, PropertyAmenity, Inquiry, Testimonial, BlogPost, ActivityLog, PageVisit, SiteSettings, FAQ, ExternalLink
+from models import (db, User, Property, PropertyImage, PropertyVideo, PropertyAmenity,
+                     Inquiry, Testimonial, BlogPost, ActivityLog, PageVisit, SiteSettings,
+                     FAQ, ExternalLink, Task, Note, PropertyNote)
 
 app = Flask(__name__)
 
@@ -33,7 +35,22 @@ app.config['WTF_CSRF_ENABLED'] = True
 app.config['WTF_CSRF_TIME_LIMIT'] = None  # no expiry
 
 ALLOWED_IMG = {'jpg','jpeg','png','webp','gif'}
-ALLOWED_ALL = {'jpg','jpeg','png','webp','gif','mp4','mov','pdf','docx'}
+ALLOWED_VIDEO = {'mp4','mov','webm'}
+ALLOWED_ALL = {'jpg','jpeg','png','webp','gif','mp4','mov','webm','pdf','docx'}
+
+def youtube_embed_url(url):
+    """Convert a YouTube/Vimeo URL to an embeddable URL"""
+    if not url: return ''
+    url = url.strip()
+    yt = re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/|youtube\.com/shorts/)([A-Za-z0-9_-]{6,})', url)
+    if yt:
+        return f"https://www.youtube.com/embed/{yt.group(1)}"
+    vm = re.search(r'vimeo\.com/(\d+)', url)
+    if vm:
+        return f"https://player.vimeo.com/video/{vm.group(1)}"
+    if 'embed' in url:
+        return url
+    return url
 
 # ── EXTENSIONS ──────────────────────────────────────────────────────
 db.init_app(app)
@@ -47,7 +64,7 @@ limiter = Limiter(key_func=get_remote_address, app=app,
                   default_limits=["500 per day", "100 per hour"],
                   storage_uri="memory://")
 
-for folder in ['properties','profiles','documents','blog','backups']:
+for folder in ['properties','profiles','documents','blog','backups','videos']:
     os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], folder), exist_ok=True)
 
 # ── HELPERS ─────────────────────────────────────────────────────────
@@ -69,6 +86,15 @@ def save_image(file, folder='properties', max_size=(1200,900)):
         fname = f"{uuid.uuid4().hex}.{ext2}"
         path = os.path.join(app.config['UPLOAD_FOLDER'], folder, fname)
         file.seek(0); file.save(path)
+    return fname
+
+def save_video(file, folder='videos'):
+    if not file or not file.filename: return None
+    ext = file.filename.rsplit('.',1)[-1].lower()
+    if ext not in ALLOWED_VIDEO: return None
+    fname = f"{uuid.uuid4().hex}.{ext}"
+    path = os.path.join(app.config['UPLOAD_FOLDER'], folder, fname)
+    file.save(path)
     return fname
 
 def log_activity(action, details=None):
@@ -151,7 +177,144 @@ def clean(s, tags=None):
     allowed = tags or []
     return bleach.clean(s or '', tags=allowed, strip=True)
 
+def format_price_str(price, unit='total'):
+    if price >= 10000000: txt = f"₹ {price/10000000:.2f} Cr"
+    elif price >= 100000: txt = f"₹ {price/100000:.2f} Lakh"
+    else: txt = f"₹ {price:,.0f}"
+    if unit == 'per_month': txt += " / month"
+    elif unit == 'per_sqft': txt += " / sqft"
+    return txt
+
+def generate_brochure_pdf(prop):
+    """Auto-generate a professional PDF brochure for a property using reportlab"""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib.colors import HexColor
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Image as RLImage,
+                                     Table, TableStyle, HRFlowable)
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+    s = get_settings()
+    primary = HexColor(s.get('primary_color','#1a56db'))
+
+    fname = f"brochure_{prop.property_id}.pdf"
+    path = os.path.join(app.config['UPLOAD_FOLDER'],'documents', fname)
+
+    doc = SimpleDocTemplate(path, pagesize=A4,
+                             topMargin=18*mm, bottomMargin=18*mm,
+                             leftMargin=18*mm, rightMargin=18*mm)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('TitleX', parent=styles['Title'], textColor=primary, fontSize=22, spaceAfter=4)
+    h2 = ParagraphStyle('H2', parent=styles['Heading2'], textColor=primary, spaceBefore=14, spaceAfter=6)
+    normal = styles['Normal']
+    small = ParagraphStyle('Small', parent=styles['Normal'], fontSize=9, textColor=HexColor('#64748b'))
+    price_style = ParagraphStyle('Price', parent=styles['Title'], textColor=primary, fontSize=20, alignment=TA_LEFT, spaceAfter=2)
+
+    elements = []
+
+    # Header - business name
+    elements.append(Paragraph(s.get('site_name','Real Estate'), ParagraphStyle('Brand', parent=styles['Heading1'], textColor=primary, fontSize=16)))
+    elements.append(Paragraph(s.get('tagline',''), small))
+    elements.append(HRFlowable(width="100%", thickness=1, color=primary, spaceAfter=10, spaceBefore=6))
+
+    # Title
+    elements.append(Paragraph(prop.title, title_style))
+    elements.append(Paragraph(f"Property ID: {prop.property_id}  |  {prop.property_type} · For {prop.listing_type.title()}", small))
+    elements.append(Spacer(1, 8))
+
+    # Main image
+    if prop.images:
+        try:
+            img_path = os.path.join(app.config['UPLOAD_FOLDER'],'properties', prop.images[0].filename)
+            if os.path.exists(img_path):
+                img = RLImage(img_path, width=170*mm, height=95*mm)
+                elements.append(img)
+                elements.append(Spacer(1, 10))
+        except Exception: pass
+
+    # Price
+    elements.append(Paragraph(format_price_str(prop.price, prop.price_unit), price_style))
+    elements.append(Spacer(1, 8))
+
+    # Key details table
+    rows = []
+    rows.append(['Location', f"{prop.city or ''}{', ' + prop.state if prop.state else ''}"])
+    if prop.area: rows.append(['Area', f"{prop.area:.0f} {prop.area_unit}"])
+    if prop.bedrooms: rows.append(['Bedrooms', str(prop.bedrooms)])
+    if prop.bathrooms: rows.append(['Bathrooms', str(prop.bathrooms)])
+    if prop.parking: rows.append(['Parking', str(prop.parking)])
+    if prop.furnishing: rows.append(['Furnishing', prop.furnishing.title()])
+    if prop.property_age: rows.append(['Property Age', prop.property_age])
+    rows.append(['Status', prop.status.replace('_',' ').title()])
+
+    table = Table(rows, colWidths=[45*mm, 120*mm])
+    table.setStyle(TableStyle([
+        ('FONTSIZE',(0,0),(-1,-1),10),
+        ('TEXTCOLOR',(0,0),(0,-1), HexColor('#64748b')),
+        ('FONTNAME',(0,0),(0,-1),'Helvetica-Bold'),
+        ('BOTTOMPADDING',(0,0),(-1,-1),5),
+        ('TOPPADDING',(0,0),(-1,-1),5),
+        ('LINEBELOW',(0,0),(-1,-1),0.5,HexColor('#e2e8f0')),
+    ]))
+    elements.append(table)
+    elements.append(Spacer(1, 10))
+
+    # Description
+    if prop.description:
+        elements.append(Paragraph('About this Property', h2))
+        desc_text = bleach.clean(prop.description, tags=[], strip=True)
+        elements.append(Paragraph(desc_text[:1200], normal))
+
+    # Amenities
+    if prop.amenities:
+        elements.append(Paragraph('Amenities', h2))
+        amenity_text = '  •  '.join([a.name for a in prop.amenities])
+        elements.append(Paragraph(amenity_text, normal))
+
+    # Address
+    if prop.address:
+        elements.append(Paragraph('Address', h2))
+        elements.append(Paragraph(prop.address, normal))
+
+    # Map snapshot link
+    if prop.latitude and prop.longitude:
+        elements.append(Spacer(1, 6))
+        elements.append(Paragraph(f"Location Coordinates: {prop.latitude}, {prop.longitude}", small))
+        elements.append(Paragraph(f"View on map: https://www.openstreetmap.org/?mlat={prop.latitude}&mlon={prop.longitude}#map=16/{prop.latitude}/{prop.longitude}", small))
+
+    elements.append(Spacer(1, 16))
+    elements.append(HRFlowable(width="100%", thickness=1, color=HexColor('#e2e8f0'), spaceAfter=8))
+
+    # Contact footer
+    elements.append(Paragraph('Contact Us', h2))
+    contact_rows = [
+        ['Agent', s.get('agent_name','')],
+        ['Phone', s.get('phone','')],
+        ['WhatsApp', '+' + s.get('whatsapp','')],
+        ['Email', s.get('email','')],
+        ['Address', s.get('address','')],
+    ]
+    ctable = Table(contact_rows, colWidths=[35*mm, 130*mm])
+    ctable.setStyle(TableStyle([
+        ('FONTSIZE',(0,0),(-1,-1),10),
+        ('TEXTCOLOR',(0,0),(0,-1), HexColor('#64748b')),
+        ('FONTNAME',(0,0),(0,-1),'Helvetica-Bold'),
+        ('BOTTOMPADDING',(0,0),(-1,-1),4),
+    ]))
+    elements.append(ctable)
+
+    doc.build(elements)
+    return fname
+
 # ── PUBLIC ROUTES ────────────────────────────────────────────────────
+
+@app.route('/favicon.ico')
+def favicon():
+    s = get_settings()
+    if s.get('favicon'):
+        return redirect(url_for('static', filename='uploads/profiles/' + s['favicon']))
+    return ('', 204)
 
 @app.route('/')
 def index():
@@ -326,9 +489,57 @@ def owner_dashboard():
     month_v=PageVisit.query.filter(PageVisit.created_at>=today.replace(day=1)).count()
     top_props=Property.query.order_by(Property.views.desc()).limit(5).all()
     recent_inqs=Inquiry.query.order_by(Inquiry.created_at.desc()).limit(5).all()
+    available_count=Property.query.filter_by(status='available').count()
+    sold_count=Property.query.filter_by(status='sold').count()
+    rented_count=Property.query.filter_by(status='rented').count()
+    negotiation_count=Property.query.filter_by(status='under_negotiation').count()
+    tasks=Task.query.order_by(Task.is_done, Task.due_date.asc().nullslast(), Task.created_at.desc()).limit(8).all()
+    notes=Note.query.order_by(Note.created_at.desc()).limit(6).all()
+    pending_tasks=Task.query.filter_by(is_done=False).count()
     return render_template('owner/dashboard.html',total_props=total_props,total_inqs=total_inqs,
                            unread=unread,today_v=today_v,month_v=month_v,
-                           top_props=top_props,recent_inqs=recent_inqs)
+                           top_props=top_props,recent_inqs=recent_inqs,
+                           available_count=available_count,sold_count=sold_count,
+                           rented_count=rented_count,negotiation_count=negotiation_count,
+                           tasks=tasks,notes=notes,pending_tasks=pending_tasks)
+
+@app.route('/owner/tasks', methods=['POST'])
+@login_required
+@owner_required
+def manage_tasks():
+    action=request.form.get('action')
+    if action=='add':
+        title=clean(request.form.get('title',''))
+        due=request.form.get('due_date','')
+        due_date=None
+        if due:
+            try: due_date=datetime.strptime(due,'%Y-%m-%d').date()
+            except Exception: pass
+        if title:
+            db.session.add(Task(title=title,priority=request.form.get('priority','normal'),due_date=due_date))
+            db.session.commit()
+    elif action=='toggle':
+        t=Task.query.get(request.form.get('id',type=int))
+        if t: t.is_done=not t.is_done; db.session.commit()
+    elif action=='delete':
+        t=Task.query.get(request.form.get('id',type=int))
+        if t: db.session.delete(t); db.session.commit()
+    return redirect(url_for('owner_dashboard'))
+
+@app.route('/owner/notes', methods=['POST'])
+@login_required
+@owner_required
+def manage_notes():
+    action=request.form.get('action')
+    if action=='add':
+        content=clean(request.form.get('content',''))
+        if content:
+            db.session.add(Note(content=content,color=request.form.get('color','yellow')))
+            db.session.commit()
+    elif action=='delete':
+        n=Note.query.get(request.form.get('id',type=int))
+        if n: db.session.delete(n); db.session.commit()
+    return redirect(url_for('owner_dashboard'))
 
 @app.route('/owner/properties')
 @login_required
@@ -388,7 +599,21 @@ def add_property():
         for img in request.files.getlist('images[]'):
             fn=save_image(img,'properties')
             if fn: db.session.add(PropertyImage(property_id=prop.id,filename=fn,is_primary=first)); first=False
+
+        _save_property_videos(prop)
+
         db.session.commit()
+
+        # Auto-generate brochure if requested and none uploaded
+        if request.form.get('auto_brochure')=='1' and not prop.brochure_path:
+            try:
+                fn=generate_brochure_pdf(prop)
+                prop.brochure_path=fn
+                prop.brochure_auto=True
+                db.session.commit()
+            except Exception as e:
+                log_activity('Brochure Generation Failed', str(e))
+
         log_activity('Add Property',title)
         flash('Property added!','success')
         return redirect(url_for('owner_properties'))
@@ -399,6 +624,29 @@ def _unique_slug(base, model):
     slug=base; n=1
     while model.query.filter_by(slug=slug).first(): slug=f"{base}-{n}"; n+=1
     return slug
+
+def _save_property_videos(prop):
+    """Save YouTube/Vimeo links and uploaded video files for a property"""
+    # YouTube/Vimeo links (multiple, one per line or repeated field)
+    for link in request.form.getlist('youtube_links[]'):
+        link = link.strip()
+        if link:
+            embed = youtube_embed_url(link)
+            title = clean(request.form.get('youtube_title_' + str(hash(link)) , ''))
+            db.session.add(PropertyVideo(property_id=prop.id, video_type='youtube',
+                                          url=embed, title=title or 'Property Video'))
+    # Set primary video_url field for backward compatibility (first youtube link)
+    yt_links = [l.strip() for l in request.form.getlist('youtube_links[]') if l.strip()]
+    if yt_links and not prop.video_url:
+        prop.video_url = youtube_embed_url(yt_links[0])
+
+    # Uploaded video files
+    for vid in request.files.getlist('video_files[]'):
+        if vid and vid.filename:
+            fn = save_video(vid)
+            if fn:
+                db.session.add(PropertyVideo(property_id=prop.id, video_type='upload',
+                                              filename=fn, title='Property Video'))
 
 @app.route('/owner/property/<int:pid>/edit', methods=['GET','POST'])
 @login_required
@@ -439,7 +687,31 @@ def edit_property(pid):
         for img in request.files.getlist('images[]'):
             fn=save_image(img,'properties')
             if fn: db.session.add(PropertyImage(property_id=prop.id,filename=fn))
+
+        # Brochure upload (manual overrides auto)
+        brochure=request.files.get('brochure')
+        if brochure and brochure.filename:
+            ext=secure_filename(brochure.filename).rsplit('.',1)[-1].lower()
+            if ext in {'pdf','docx'}:
+                fn=f"{uuid.uuid4().hex}.{ext}"
+                brochure.save(os.path.join(app.config['UPLOAD_FOLDER'],'documents',fn))
+                prop.brochure_path=fn
+                prop.brochure_auto=False
+
+        _save_property_videos(prop)
+
         db.session.commit()
+
+        # Auto-generate / regenerate brochure
+        if request.form.get('auto_brochure')=='1':
+            try:
+                fn=generate_brochure_pdf(prop)
+                prop.brochure_path=fn
+                prop.brochure_auto=True
+                db.session.commit()
+            except Exception as e:
+                log_activity('Brochure Generation Failed', str(e))
+
         log_activity('Edit Property',prop.title)
         flash('Property updated!','success')
         return redirect(url_for('owner_properties'))
@@ -465,6 +737,67 @@ def delete_property_image(iid):
     except Exception: pass
     db.session.delete(img); db.session.commit()
     return jsonify({'success':True})
+
+@app.route('/owner/property/video/<int:vid>/delete', methods=['POST'])
+@login_required
+@owner_required
+def delete_property_video(vid):
+    video=PropertyVideo.query.get_or_404(vid)
+    if video.video_type=='upload' and video.filename:
+        try: os.remove(os.path.join(app.config['UPLOAD_FOLDER'],'videos',video.filename))
+        except Exception: pass
+    db.session.delete(video); db.session.commit()
+    return jsonify({'success':True})
+
+@app.route('/owner/property/<int:pid>/generate-brochure', methods=['POST'])
+@login_required
+@owner_required
+def generate_brochure(pid):
+    prop=Property.query.get_or_404(pid)
+    try:
+        # remove old auto-generated brochure
+        if prop.brochure_path and prop.brochure_auto:
+            try: os.remove(os.path.join(app.config['UPLOAD_FOLDER'],'documents',prop.brochure_path))
+            except Exception: pass
+        fn=generate_brochure_pdf(prop)
+        prop.brochure_path=fn
+        prop.brochure_auto=True
+        db.session.commit()
+        log_activity('Generate Brochure', prop.title)
+        flash('✅ PDF brochure generated successfully!','success')
+    except Exception as e:
+        flash(f'Brochure generation failed: {str(e)}','danger')
+    return redirect(request.referrer or url_for('owner_properties'))
+
+@app.route('/owner/property/<int:pid>/notes', methods=['POST'])
+@login_required
+@owner_required
+def add_property_note(pid):
+    prop=Property.query.get_or_404(pid)
+    content=clean(request.form.get('content',''))
+    if content:
+        db.session.add(PropertyNote(property_id=prop.id, content=content))
+        db.session.commit()
+        flash('Note added.','success')
+    return redirect(url_for('edit_property', pid=pid))
+
+@app.route('/owner/property/note/<int:nid>/delete', methods=['POST'])
+@login_required
+@owner_required
+def delete_property_note(nid):
+    note=PropertyNote.query.get_or_404(nid)
+    pid=note.property_id
+    db.session.delete(note); db.session.commit()
+    return redirect(url_for('edit_property', pid=pid))
+
+@app.route('/owner/property/<int:pid>/toggle-public-link', methods=['POST'])
+@login_required
+@owner_required
+def toggle_public_link(pid):
+    prop=Property.query.get_or_404(pid)
+    prop.public_link_enabled = not prop.public_link_enabled
+    db.session.commit()
+    return jsonify({'success':True,'enabled':prop.public_link_enabled})
 
 @app.route('/owner/inquiries')
 @login_required
@@ -619,8 +952,31 @@ def developer_dashboard():
     total_p=Property.query.count()
     total_i=Inquiry.query.count()
     logs=ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(20).all()
+
+    # System / storage info
+    upload_dir = app.config['UPLOAD_FOLDER']
+    total_size = 0
+    file_count = 0
+    for root, dirs, files in os.walk(upload_dir):
+        for f in files:
+            if f == '.gitkeep': continue
+            try:
+                total_size += os.path.getsize(os.path.join(root, f))
+                file_count += 1
+            except Exception: pass
+    storage_mb = round(total_size / (1024*1024), 2)
+
+    today = datetime.utcnow().date()
+    today_v = PageVisit.query.filter(db.func.date(PageVisit.created_at)==today).count()
+    unread_msgs = Inquiry.query.filter_by(is_read=False).count()
+    total_videos = PropertyVideo.query.count()
+    auto_brochures = Property.query.filter_by(brochure_auto=True).count()
+
     return render_template('developer/dashboard.html',users=users,total_v=total_v,
-                           total_p=total_p,total_i=total_i,logs=logs)
+                           total_p=total_p,total_i=total_i,logs=logs,
+                           storage_mb=storage_mb, file_count=file_count,
+                           today_v=today_v, unread_msgs=unread_msgs,
+                           total_videos=total_videos, auto_brochures=auto_brochures)
 
 @app.route('/developer/users', methods=['GET','POST'])
 @login_required
@@ -906,12 +1262,12 @@ def init_db():
                 db.session.add(SiteSettings(key=k,value=v))
         db.session.commit()
 
-if __name__=='__main__':
-    init_db()
-    app.run(debug=True)
-
 # Compatibility redirect for flask-login's redirect
 @app.route('/login')
 def login_redirect():
     s = get_settings()
     return redirect(url_for('login', login_path=s.get('admin_path','admin')))
+
+if __name__=='__main__':
+    init_db()
+    app.run(debug=True)

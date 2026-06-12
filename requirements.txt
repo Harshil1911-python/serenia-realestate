@@ -19,3 +19,4 @@ qrcode==8.0
 Werkzeug==3.0.6
 itsdangerous==2.2.0
 bleach==6.1.0
+reportlab==4.2.5

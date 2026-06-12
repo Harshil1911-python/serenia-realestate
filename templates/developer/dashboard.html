@@ -10,6 +10,51 @@
   <div class="stat-card stat-green"><div class="stat-icon"><i class="fas fa-eye"></i></div><div class="stat-info"><h3>{{ total_v }}</h3><p>Total Page Visits</p></div></div>
   <div class="stat-card stat-orange"><div class="stat-icon"><i class="fas fa-home"></i></div><div class="stat-info"><h3>{{ total_p }}</h3><p>Properties</p></div></div>
   <div class="stat-card stat-purple"><div class="stat-icon"><i class="fas fa-envelope"></i></div><div class="stat-info"><h3>{{ total_i }}</h3><p>Messages</p></div></div>
+  <div class="stat-card stat-teal"><div class="stat-icon"><i class="fas fa-eye"></i></div><div class="stat-info"><h3>{{ today_v }}</h3><p>Today's Visits</p></div></div>
+</div>
+
+<!-- System Info -->
+<div class="dashboard-grid" style="margin-bottom:1.5rem">
+  <div class="card">
+    <div class="card-header"><h3><i class="fas fa-server" style="color:var(--primary)"></i> System Info</h3></div>
+    <div class="card-body">
+      <div class="detail-rows">
+        <div class="detail-row"><span>Storage Used</span><strong>{{ storage_mb }} MB</strong></div>
+        <div class="detail-row"><span>Total Files</span><strong>{{ file_count }}</strong></div>
+        <div class="detail-row"><span>Property Videos</span><strong>{{ total_videos }}</strong></div>
+        <div class="detail-row"><span>Auto Brochures</span><strong>{{ auto_brochures }}</strong></div>
+        <div class="detail-row"><span>Unread Messages</span><strong>{{ unread_msgs }}</strong></div>
+      </div>
+      <div class="storage-bar-wrap">
+        <div class="storage-bar"><div class="storage-bar-fill" style="width:{{ (storage_mb/500*100)|round(1) if storage_mb < 500 else 100 }}%"></div></div>
+        <small style="color:var(--gray)">{{ storage_mb }} MB used (estimate, free tier ~500MB-1GB)</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3><i class="fas fa-bolt" style="color:var(--accent)"></i> Quick Stats</h3></div>
+    <div class="card-body">
+      <div class="dev-tools-grid">
+        <a href="{{ url_for('all_messages') }}" class="dev-tool-card">
+          <i class="fas fa-envelope"></i>
+          <span>{{ unread_msgs }} New Msgs</span>
+        </a>
+        <a href="{{ url_for('owner_properties') }}" class="dev-tool-card">
+          <i class="fas fa-home"></i>
+          <span>{{ total_p }} Listings</span>
+        </a>
+        <a href="{{ url_for('manage_users') }}" class="dev-tool-card">
+          <i class="fas fa-users"></i>
+          <span>{{ users|length }} Users</span>
+        </a>
+        <a href="{{ url_for('database_overview') }}" class="dev-tool-card">
+          <i class="fas fa-database"></i>
+          <span>Manage DB</span>
+        </a>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="card" style="margin-bottom:1.5rem">
@@ -24,6 +69,10 @@
       <a href="{{ url_for('activity_logs') }}" class="dev-tool-card"><i class="fas fa-history"></i><span>Logs</span></a>
       <a href="{{ url_for('database_overview') }}" class="dev-tool-card"><i class="fas fa-database"></i><span>DB & Backup</span></a>
       <a href="{{ url_for('create_backup') }}" class="dev-tool-card"><i class="fas fa-download"></i><span>Download Backup</span></a>
+      <a href="{{ url_for('owner_properties') }}" class="dev-tool-card"><i class="fas fa-home"></i><span>Properties</span></a>
+      <a href="{{ url_for('owner_settings') }}" class="dev-tool-card"><i class="fas fa-cog"></i><span>Site Settings</span></a>
+      <a href="{{ url_for('owner_dashboard') }}" class="dev-tool-card"><i class="fas fa-th-large"></i><span>Owner View</span></a>
+      <a href="{{ url_for('index') }}" target="_blank" class="dev-tool-card"><i class="fas fa-globe"></i><span>View Site</span></a>
     </div>
   </div>
 </div>

@@ -11,6 +11,19 @@
   <div class="stat-card stat-teal"><div class="stat-icon"><i class="fas fa-chart-line"></i></div><div class="stat-info"><h3>{{ month_v }}</h3><p>Monthly Visitors</p></div></div>
 </div>
 
+<!-- Property Status Breakdown -->
+<div class="card" style="margin-bottom:1.5rem">
+  <div class="card-header"><h3><i class="fas fa-chart-pie" style="color:var(--primary)"></i> Property Status Overview</h3></div>
+  <div class="card-body">
+    <div class="status-breakdown">
+      <div class="status-box available"><h3>{{ available_count }}</h3><p>Available</p></div>
+      <div class="status-box sold"><h3>{{ sold_count }}</h3><p>Sold</p></div>
+      <div class="status-box rented"><h3>{{ rented_count }}</h3><p>Rented</p></div>
+      <div class="status-box negotiation"><h3>{{ negotiation_count }}</h3><p>Negotiation</p></div>
+    </div>
+  </div>
+</div>
+
 <div class="card" style="margin-bottom:1.5rem">
   <div class="card-header"><h3>Quick Actions</h3></div>
   <div class="card-body">
@@ -19,6 +32,10 @@
       <a href="{{ url_for('owner_inquiries') }}" class="quick-action-btn"><i class="fas fa-envelope"></i><span>Inquiries{% if unread %} ({{ unread }}){% endif %}</span></a>
       <a href="{{ url_for('export_inquiries') }}" class="quick-action-btn"><i class="fas fa-file-csv"></i><span>Export CSV</span></a>
       <a href="{{ url_for('owner_settings') }}" class="quick-action-btn"><i class="fas fa-cog"></i><span>Settings</span></a>
+      <a href="{{ url_for('owner_testimonials') }}" class="quick-action-btn"><i class="fas fa-star"></i><span>Testimonials</span></a>
+      <a href="{{ url_for('owner_blog') }}" class="quick-action-btn"><i class="fas fa-blog"></i><span>Blog</span></a>
+      <a href="{{ url_for('owner_faqs') }}" class="quick-action-btn"><i class="fas fa-question-circle"></i><span>FAQs</span></a>
+      <a href="{{ url_for('index') }}" target="_blank" class="quick-action-btn"><i class="fas fa-globe"></i><span>View Site</span></a>
     </div>
   </div>
 </div>
@@ -71,6 +88,91 @@
       </div>
       {% else %}
       <div class="empty-state-sm"><i class="fas fa-envelope"></i><p>No inquiries yet.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Tasks & Notes Widgets -->
+<div class="widget-grid">
+  <!-- Tasks Widget -->
+  <div class="card">
+    <div class="card-header">
+      <h3><i class="fas fa-tasks" style="color:var(--primary)"></i> To-Do List {% if pending_tasks %}<span class="badge badge-unread">{{ pending_tasks }}</span>{% endif %}</h3>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('manage_tasks') }}" class="task-add-form" style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="add">
+        <input type="text" name="title" class="form-input" placeholder="Add a task..." required style="flex:1;min-width:140px">
+        <select name="priority" class="form-input" style="width:110px">
+          <option value="normal">Normal</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+        </select>
+        <input type="date" name="due_date" class="form-input" style="width:140px">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i></button>
+      </form>
+      {% if tasks %}
+      <div class="task-list">
+        {% for t in tasks %}
+        <div class="task-item">
+          <form method="POST" action="{{ url_for('manage_tasks') }}" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="toggle">
+            <input type="hidden" name="id" value="{{ t.id }}">
+            <input type="checkbox" class="task-checkbox" {% if t.is_done %}checked{% endif %} onchange="this.form.submit()">
+          </form>
+          <span class="task-priority priority-{{ t.priority }}"></span>
+          <span class="task-title {% if t.is_done %}done{% endif %}">{{ t.title }}</span>
+          {% if t.due_date %}<span class="task-due"><i class="fas fa-calendar"></i> {{ t.due_date.strftime('%d %b') }}</span>{% endif %}
+          <form method="POST" action="{{ url_for('manage_tasks') }}" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="id" value="{{ t.id }}">
+            <button type="submit" class="btn btn-xs btn-danger"><i class="fas fa-times"></i></button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state-sm"><i class="fas fa-check-circle"></i><p>No tasks yet. Add one above!</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Notes Widget -->
+  <div class="card">
+    <div class="card-header"><h3><i class="fas fa-sticky-note" style="color:var(--accent)"></i> Quick Notes</h3></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('manage_notes') }}" style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="add">
+        <input type="text" name="content" class="form-input" placeholder="Write a note..." required style="flex:1;min-width:140px">
+        <select name="color" class="form-input" style="width:110px">
+          <option value="yellow">Yellow</option>
+          <option value="blue">Blue</option>
+          <option value="green">Green</option>
+          <option value="pink">Pink</option>
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i></button>
+      </form>
+      {% if notes %}
+      <div class="notes-grid">
+        {% for n in notes %}
+        <div class="note-card color-{{ n.color }}">
+          <form method="POST" action="{{ url_for('manage_notes') }}" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="id" value="{{ n.id }}">
+            <button type="submit" class="note-delete"><i class="fas fa-times"></i></button>
+          </form>
+          <p>{{ n.content }}</p>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state-sm"><i class="fas fa-sticky-note"></i><p>No notes yet. Add one above!</p></div>
       {% endif %}
     </div>
   </div>

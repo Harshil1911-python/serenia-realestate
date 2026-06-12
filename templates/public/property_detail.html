@@ -39,15 +39,34 @@
           {% endif %}
         </div>
 
-        <!-- Video -->
-        {% if prop.video_url %}
+        <!-- Video Gallery -->
+        {% if prop.videos or prop.video_url %}
         <div class="section-card">
-          <h3>Property Video</h3>
-          <div class="video-wrap">
-            <iframe src="{{ prop.video_url }}" frameborder="0" allowfullscreen loading="lazy"></iframe>
+          <h3><i class="fas fa-video"></i> Video Gallery</h3>
+          <div class="video-gallery">
+            {% if prop.videos %}
+              {% for v in prop.videos %}
+                {% if v.video_type == 'youtube' %}
+                <div class="video-wrap">
+                  <iframe src="{{ v.url }}" frameborder="0" allowfullscreen loading="lazy" title="{{ v.title or 'Property Video' }}"></iframe>
+                </div>
+                {% else %}
+                <div class="video-wrap">
+                  <video controls preload="metadata" style="width:100%;height:100%;object-fit:cover;border-radius:12px">
+                    <source src="{{ url_for('static', filename='uploads/videos/' + v.filename) }}" type="video/mp4">
+                  </video>
+                </div>
+                {% endif %}
+              {% endfor %}
+            {% elif prop.video_url %}
+              <div class="video-wrap">
+                <iframe src="{{ prop.video_url }}" frameborder="0" allowfullscreen loading="lazy"></iframe>
+              </div>
+            {% endif %}
           </div>
         </div>
         {% endif %}
+
 
         <!-- Description -->
         <div class="section-card">
@@ -87,8 +106,13 @@
         <!-- Map (Leaflet) -->
         {% if prop.latitude and prop.longitude %}
         <div class="section-card">
-          <h3>Location on Map</h3>
-          <div id="propDetailMap" style="height:340px;border-radius:12px;overflow:hidden;"></div>
+          <h3><i class="fas fa-map-marked-alt"></i> Location on Map</h3>
+          <div id="propDetailMap" style="height:380px;border-radius:12px;overflow:hidden;"></div>
+          <div class="map-actions">
+            <a href="https://www.openstreetmap.org/directions?to={{ prop.latitude }}%2C{{ prop.longitude }}" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-directions"></i> Get Directions</a>
+            <a href="https://www.google.com/maps/search/?api=1&query={{ prop.latitude }},{{ prop.longitude }}" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-map-marker-alt"></i> Open in Google Maps</a>
+            <button type="button" class="btn btn-outline btn-sm" onclick="toggleNearby()"><i class="fas fa-store"></i> Show Nearby Places</button>
+          </div>
         </div>
         {% elif prop.google_map_link %}
         <div class="section-card">
@@ -96,6 +120,7 @@
           <div class="map-embed">{{ prop.google_map_link|safe }}</div>
         </div>
         {% endif %}
+
 
         <!-- Similar -->
         {% if similar %}
@@ -218,17 +243,77 @@ async function submitInquiry(e, propId) {
 
 // Leaflet map
 {% if prop.latitude and prop.longitude %}
-const map = L.map('propDetailMap').setView([{{ prop.latitude }}, {{ prop.longitude }}], 15);
+const propLat = {{ prop.latitude }}, propLng = {{ prop.longitude }};
+const map = L.map('propDetailMap').setView([propLat, propLng], 15);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
 }).addTo(map);
-L.marker([{{ prop.latitude }}, {{ prop.longitude }}]).addTo(map)
+L.marker([propLat, propLng]).addTo(map)
   .bindPopup('<strong>{{ prop.title }}</strong><br>{{ prop.address or prop.city }}').openPopup();
 // Add circle for area
-L.circle([{{ prop.latitude }}, {{ prop.longitude }}], {
-  color: 'var(--primary, #1a56db)', fillColor: 'var(--primary, #1a56db)',
-  fillOpacity: 0.1, radius: 500
+L.circle([propLat, propLng], {
+  color: '#1a56db', fillColor: '#1a56db',
+  fillOpacity: 0.08, radius: 500
 }).addTo(map);
+
+// Nearby places via Overpass API
+let nearbyLoaded = false;
+const nearbyLayer = L.layerGroup();
+const nearbyIcons = {
+  school: {icon:'fa-school', color:'#3b82f6', label:'School'},
+  hospital: {icon:'fa-hospital', color:'#ef4444', label:'Hospital'},
+  restaurant: {icon:'fa-utensils', color:'#f59e0b', label:'Restaurant'},
+  supermarket: {icon:'fa-shopping-cart', color:'#22c55e', label:'Supermarket'},
+  bank: {icon:'fa-university', color:'#8b5cf6', label:'Bank/ATM'},
+  bus_station: {icon:'fa-bus', color:'#06b6d4', label:'Bus Stop'},
+  pharmacy: {icon:'fa-prescription-bottle', color:'#ec4899', label:'Pharmacy'},
+  park: {icon:'fa-tree', color:'#84cc16', label:'Park'}
+};
+
+async function toggleNearby() {
+  if (map.hasLayer(nearbyLayer)) {
+    map.removeLayer(nearbyLayer);
+    return;
+  }
+  if (!nearbyLoaded) {
+    const query = `
+      [out:json][timeout:15];
+      (
+        node["amenity"="school"](around:1200,${propLat},${propLng});
+        node["amenity"="hospital"](around:1200,${propLat},${propLng});
+        node["amenity"="restaurant"](around:1200,${propLat},${propLng});
+        node["shop"="supermarket"](around:1200,${propLat},${propLng});
+        node["amenity"="bank"](around:1200,${propLat},${propLng});
+        node["amenity"="pharmacy"](around:1200,${propLat},${propLng});
+        node["leisure"="park"](around:1200,${propLat},${propLng});
+        node["highway"="bus_stop"](around:1200,${propLat},${propLng});
+      );
+      out body 30;
+    `;
+    try {
+      const res = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body: query});
+      const data = await res.json();
+      data.elements.forEach(el => {
+        let type = el.tags.amenity || el.tags.shop || el.tags.leisure || el.tags.highway;
+        if (type === 'bus_stop') type = 'bus_station';
+        const cfg = nearbyIcons[type];
+        if (!cfg) return;
+        const icon = L.divIcon({
+          html: `<div style="background:${cfg.color};color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3)"><i class="fas ${cfg.icon}" style="font-size:12px"></i></div>`,
+          className:'', iconSize:[28,28], iconAnchor:[14,14]
+        });
+        L.marker([el.lat, el.lon], {icon})
+          .bindPopup(`<strong>${el.tags.name || cfg.label}</strong><br>${cfg.label}`)
+          .addTo(nearbyLayer);
+      });
+      nearbyLoaded = true;
+    } catch(e) {
+      alert('Could not load nearby places. Please try again.');
+      return;
+    }
+  }
+  nearbyLayer.addTo(map);
+}
 {% endif %}
 </script>
 {% endblock %}
