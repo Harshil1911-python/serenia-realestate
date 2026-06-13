@@ -14,17 +14,45 @@
     </div>
   </div>
   <div class="card-body">
+
     <form method="POST" enctype="multipart/form-data" class="property-form" id="propertyForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <!-- ── BROCHURE AUTO-FILL ── -->
+      <div class="form-section brochure-autofill-section">
+        <h4 class="form-section-title"><i class="fas fa-magic"></i> Auto-Fill from Brochure (PDF)</h4>
+        <p class="form-hint" style="margin-bottom:.75rem">
+          Upload a property brochure PDF — we'll automatically extract text details (BHK, price, area, RERA number, possession date, amenities, location, contact info) and any photos inside it. Review the
+          <span class="extract-dot extract-dot-green" style="display:inline-block;position:relative;top:1px"></span> green /
+          <span class="extract-dot extract-dot-red" style="display:inline-block;position:relative;top:1px"></span> red dots next to each field below after extraction.
+        </p>
+        <div class="brochure-upload-row">
+          <input type="file" id="brochurePdfInput" accept="application/pdf" class="form-input" style="max-width:360px">
+          <button type="button" class="btn btn-primary btn-sm" id="extractBrochureBtn" onclick="extractBrochure()">
+            <i class="fas fa-bolt"></i> Extract &amp; Auto-Fill
+          </button>
+          <span id="extractStatus" class="extract-status"></span>
+        </div>
+
+        <!-- Extracted photos picker -->
+        <div id="brochureImagesWrap" style="display:none;margin-top:1rem">
+          <label>Photos found in brochure — select which to add to the gallery:</label>
+          <div id="brochureImagesGrid" class="image-preview-grid brochure-images-grid"></div>
+        </div>
+
+        <!-- Extra info extracted but without a dedicated form field -->
+        <div id="brochureExtraInfo" class="brochure-extra-info" style="display:none"></div>
+      </div>
 
       <!-- Basic Info -->
       <div class="form-section">
         <h4 class="form-section-title"><i class="fas fa-info-circle"></i> Basic Information</h4>
         <div class="form-grid">
           <div class="form-group form-col-2">
-            <label>Property Title *</label>
-            <input type="text" name="title" required class="form-input" value="{{ prop.title if prop else '' }}" placeholder="Beautiful 3BHK Apartment in Juhu">
+            <label>Property Title * <span class="extract-dot" id="dot-title"></span></label>
+            <input type="text" name="title" required class="form-input" value="{{ prop.title if prop else '' }}" placeholder="Beautiful 3BHK Apartment in Juhu" id="field-title">
           </div>
+
           <div class="form-group">
             <label>Property Type *</label>
             <select name="property_type" required class="form-input">
@@ -62,8 +90,8 @@
         <h4 class="form-section-title"><i class="fas fa-rupee-sign"></i> Pricing & Size</h4>
         <div class="form-grid">
           <div class="form-group">
-            <label>Price (₹) *</label>
-            <input type="number" name="price" required class="form-input" value="{{ prop.price if prop else '' }}" placeholder="5000000">
+            <label>Price (₹) * <span class="extract-dot" id="dot-price"></span></label>
+            <input type="number" name="price" required class="form-input" value="{{ prop.price if prop else '' }}" placeholder="5000000" id="field-price">
           </div>
           <div class="form-group">
             <label>Price Unit</label>
@@ -74,12 +102,12 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Area</label>
-            <input type="number" name="area" class="form-input" value="{{ prop.area if prop else '' }}" placeholder="1200">
+            <label>Area <span class="extract-dot" id="dot-area"></span></label>
+            <input type="number" name="area" class="form-input" value="{{ prop.area if prop else '' }}" placeholder="1200" id="field-area">
           </div>
           <div class="form-group">
-            <label>Area Unit</label>
-            <select name="area_unit" class="form-input">
+            <label>Area Unit <span class="extract-dot" id="dot-area_unit"></span></label>
+            <select name="area_unit" class="form-input" id="field-area_unit">
               <option value="sqft" {% if not prop or prop.area_unit == 'sqft' %}selected{% endif %}>sq.ft</option>
               <option value="sqm" {% if prop and prop.area_unit == 'sqm' %}selected{% endif %}>sq.m</option>
               <option value="acre" {% if prop and prop.area_unit == 'acre' %}selected{% endif %}>Acre</option>
@@ -94,8 +122,8 @@
         <h4 class="form-section-title"><i class="fas fa-ruler-combined"></i> Specifications</h4>
         <div class="form-grid">
           <div class="form-group">
-            <label>Bedrooms</label>
-            <input type="number" name="bedrooms" class="form-input" value="{{ prop.bedrooms if prop and prop.bedrooms else '' }}" min="0" placeholder="3">
+            <label>Bedrooms <span class="extract-dot" id="dot-bedrooms"></span></label>
+            <input type="number" name="bedrooms" class="form-input" value="{{ prop.bedrooms if prop and prop.bedrooms else '' }}" min="0" placeholder="3" id="field-bedrooms">
           </div>
           <div class="form-group">
             <label>Bathrooms</label>
@@ -115,8 +143,8 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Property Age</label>
-            <input type="text" name="property_age" class="form-input" value="{{ prop.property_age if prop else '' }}" placeholder="New / 2 Years / 5+ Years">
+            <label>Property Age <span class="extract-dot" id="dot-property_age"></span></label>
+            <input type="text" name="property_age" class="form-input" value="{{ prop.property_age if prop else '' }}" placeholder="New / 2 Years / 5+ Years" id="field-property_age">
           </div>
         </div>
       </div>
@@ -126,20 +154,20 @@
         <h4 class="form-section-title"><i class="fas fa-map-marker-alt"></i> Location</h4>
         <div class="form-grid">
           <div class="form-group form-col-2">
-            <label>Full Address</label>
+            <label>Full Address <span class="extract-dot" id="dot-address"></span></label>
             <input type="text" name="address" id="addressInput" class="form-input" value="{{ prop.address if prop else '' }}" placeholder="Flat 301, Sunshine Apartments, Park Street">
           </div>
           <div class="form-group">
-            <label>City</label>
-            <input type="text" name="city" class="form-input" value="{{ prop.city if prop else '' }}" placeholder="Mumbai">
+            <label>City <span class="extract-dot" id="dot-city"></span></label>
+            <input type="text" name="city" class="form-input" value="{{ prop.city if prop else '' }}" placeholder="Mumbai" id="field-city">
           </div>
           <div class="form-group">
             <label>State</label>
             <input type="text" name="state" class="form-input" value="{{ prop.state if prop else '' }}" placeholder="Maharashtra">
           </div>
           <div class="form-group">
-            <label>Pincode</label>
-            <input type="text" name="pincode" class="form-input" value="{{ prop.pincode if prop else '' }}" placeholder="400001">
+            <label>Pincode <span class="extract-dot" id="dot-pincode"></span></label>
+            <input type="text" name="pincode" class="form-input" value="{{ prop.pincode if prop else '' }}" placeholder="400001" id="field-pincode">
           </div>
           <div class="form-group">
             <label>Latitude</label>
@@ -173,9 +201,9 @@
 
       <!-- Description -->
       <div class="form-section">
-        <h4 class="form-section-title"><i class="fas fa-align-left"></i> Description</h4>
+        <h4 class="form-section-title"><i class="fas fa-align-left"></i> Description <span class="extract-dot" id="dot-description"></span></h4>
         <div class="form-group">
-          <textarea name="description" class="form-input" rows="6" placeholder="Describe the property in detail...">{{ prop.description if prop else '' }}</textarea>
+          <textarea name="description" class="form-input" rows="6" placeholder="Describe the property in detail..." id="field-description">{{ prop.description if prop else '' }}</textarea>
         </div>
       </div>
 
@@ -275,7 +303,7 @@
 
       <!-- Amenities -->
       <div class="form-section">
-        <h4 class="form-section-title"><i class="fas fa-star"></i> Amenities</h4>
+        <h4 class="form-section-title"><i class="fas fa-star"></i> Amenities <span class="extract-dot" id="dot-amenities"></span></h4>
         <div class="amenities-builder" id="amenitiesBuilder">
           {% if prop and prop.amenities %}
             {% for amenity in prop.amenities %}
@@ -375,7 +403,157 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ── IMAGE UPLOAD ──
+// ── BROCHURE AUTO-FILL EXTRACTION ──
+const BROCHURE_TRACKED_FIELDS = ['title','bedrooms','price','area','area_unit','address','city',
+  'pincode','property_age','amenities','rera_number','developer','contact','email','website','description'];
+
+// Initialize all dots to red (not extracted) on page load for tracked fields
+window.addEventListener('DOMContentLoaded', () => {
+  BROCHURE_TRACKED_FIELDS.forEach(f => {
+    const dot = document.getElementById('dot-' + f);
+    if (dot) dot.classList.add('extract-dot-red');
+  });
+});
+
+async function extractBrochure() {
+  const fileInput = document.getElementById('brochurePdfInput');
+  const statusEl = document.getElementById('extractStatus');
+  const btn = document.getElementById('extractBrochureBtn');
+
+  if (!fileInput.files || !fileInput.files[0]) {
+    statusEl.innerHTML = '<span style="color:#ef4444"><i class="fas fa-exclamation-circle"></i> Please choose a PDF first.</span>';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('brochure_pdf', fileInput.files[0]);
+  formData.append('csrf_token', '{{ csrf_token() }}');
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Extracting...';
+  statusEl.innerHTML = '<span style="color:#64748b"><i class="fas fa-spinner fa-spin"></i> Reading brochure, this may take a moment...</span>';
+
+  try {
+    const res = await fetch('{{ url_for("upload_brochure_extract") }}', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (!data.success) {
+      statusEl.innerHTML = `<span style="color:#ef4444"><i class="fas fa-exclamation-circle"></i> ${data.message || 'Extraction failed.'}</span>`;
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-bolt"></i> Extract & Auto-Fill';
+      return;
+    }
+
+    applyExtractedFields(data.fields || {}, data.status || {});
+    showExtractedImages(data.images || [], data.image_urls || []);
+    showExtraInfo(data.fields || {});
+
+    const filledCount = Object.values(data.status || {}).filter(Boolean).length;
+    const totalCount = Object.keys(data.status || {}).length;
+    statusEl.innerHTML = `<span style="color:#22c55e"><i class="fas fa-check-circle"></i> Extracted ${filledCount}/${totalCount} fields and ${(data.images||[]).length} photo(s). Review the dots below.</span>`;
+  } catch (err) {
+    statusEl.innerHTML = '<span style="color:#ef4444"><i class="fas fa-exclamation-circle"></i> Extraction failed. Please try again.</span>';
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fas fa-bolt"></i> Extract & Auto-Fill';
+}
+
+function applyExtractedFields(fields, status) {
+  // Simple text/number fields - only fill if currently empty
+  const simpleFields = {
+    'title': 'field-title',
+    'bedrooms': 'field-bedrooms',
+    'price': 'field-price',
+    'area': 'field-area',
+    'area_unit': 'field-area_unit',
+    'address': 'addressInput',
+    'city': 'field-city',
+    'pincode': 'field-pincode',
+    'property_age': 'field-property_age',
+    'description': 'field-description',
+  };
+
+  for (const [key, elId] of Object.entries(simpleFields)) {
+    const el = document.getElementById(elId);
+    if (el && fields[key] !== undefined && fields[key] !== null && fields[key] !== '') {
+      if (!el.value || el.value.trim() === '') {
+        el.value = fields[key];
+      }
+    }
+  }
+
+  // Amenities - append extracted amenities to the builder
+  if (fields.amenities && Array.isArray(fields.amenities) && fields.amenities.length) {
+    const builder = document.getElementById('amenitiesBuilder');
+    const existing = [...builder.querySelectorAll('input[name="amenities[]"]')].map(i => i.value.trim().toLowerCase());
+    fields.amenities.forEach(a => {
+      if (a && !existing.includes(a.trim().toLowerCase())) {
+        addAmenity(a);
+        existing.push(a.trim().toLowerCase());
+      }
+    });
+  }
+
+  // Set status dots (green = extracted, red = not found)
+  BROCHURE_TRACKED_FIELDS.forEach(f => {
+    const dot = document.getElementById('dot-' + f);
+    if (!dot) return;
+    dot.classList.remove('extract-dot-red', 'extract-dot-green');
+    if (status[f]) {
+      dot.classList.add('extract-dot-green');
+      dot.title = 'Auto-extracted from brochure ✓';
+    } else {
+      dot.classList.add('extract-dot-red');
+      dot.title = 'Not found in brochure — please fill manually';
+    }
+  });
+}
+
+function showExtractedImages(images, imageUrls) {
+  const wrap = document.getElementById('brochureImagesWrap');
+  const grid = document.getElementById('brochureImagesGrid');
+  grid.innerHTML = '';
+
+  if (!images.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  images.forEach((fname, idx) => {
+    const div = document.createElement('div');
+    div.className = 'img-preview-item brochure-img-item';
+    div.innerHTML = `
+      <img src="${imageUrls[idx]}" alt="">
+      <label class="brochure-img-checkbox">
+        <input type="checkbox" name="extracted_images[]" value="${fname}" ${idx < 6 ? 'checked' : ''}>
+        <span></span>
+      </label>
+    `;
+    grid.appendChild(div);
+  });
+
+  wrap.style.display = 'block';
+}
+
+function showExtraInfo(fields) {
+  const box = document.getElementById('brochureExtraInfo');
+  const extras = [];
+  if (fields.rera_number) extras.push(`<strong>RERA No:</strong> ${fields.rera_number}`);
+  if (fields.developer) extras.push(`<strong>Developer:</strong> ${fields.developer}`);
+  if (fields.contact) extras.push(`<strong>Contact:</strong> ${fields.contact}`);
+  if (fields.email) extras.push(`<strong>Email:</strong> ${fields.email}`);
+  if (fields.website) extras.push(`<strong>Website:</strong> ${fields.website}`);
+
+  if (extras.length) {
+    box.innerHTML = '<i class="fas fa-info-circle"></i> Additional info found (not auto-filled into a field — copy manually if needed): <br>' + extras.join(' &nbsp;|&nbsp; ');
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+
 const uploadZone = document.getElementById('uploadZone');
 const imageInput = document.getElementById('imageInput');
 const preview = document.getElementById('imagePreview');

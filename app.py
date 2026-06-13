@@ -1,4 +1,4 @@
-import os, uuid, csv, io, json, zipfile, shutil, re
+import os, uuid, csv, io, json, zipfile, shutil, re, hashlib
 from datetime import datetime, timedelta, date
 from functools import wraps
 from flask import (Flask, render_template, redirect, url_for, flash,
@@ -356,6 +356,226 @@ def generate_brochure_pdf(prop):
     doc.build(elements)
     return fname
 
+
+# ── BROCHURE AUTO-FILL EXTRACTION ─────────────────────────────────────
+
+# Fields tracked for the green/red "extraction status" dots in the UI
+BROCHURE_TRACKED_FIELDS = [
+    'title', 'bedrooms', 'price', 'area', 'area_unit', 'address', 'city',
+    'pincode', 'property_age', 'amenities', 'rera_number', 'developer',
+    'contact', 'email', 'website', 'description',
+]
+
+INDIAN_CITIES = [
+    'Mumbai','Navi Mumbai','Thane','Pune','Bengaluru','Bangalore','Delhi','New Delhi',
+    'Gurugram','Gurgaon','Noida','Greater Noida','Hyderabad','Chennai','Kolkata',
+    'Ahmedabad','Surat','Vadodara','Rajkot','Jaipur','Lucknow','Kanpur','Nagpur',
+    'Indore','Bhopal','Coimbatore','Kochi','Cochin','Visakhapatnam','Chandigarh',
+    'Faridabad','Ghaziabad','Patna','Vapi','Vasai','Mira Road','Kalyan',
+]
+
+def _price_to_number(value, unit):
+    """Convert a price string + unit (Cr/Lakh) to a raw rupee number."""
+    try:
+        num = float(value.replace(',', '').strip())
+    except (ValueError, AttributeError):
+        return None
+    unit = (unit or '').lower()
+    if unit.startswith('cr'):
+        return num * 10000000
+    if unit.startswith('l') or unit.startswith('lac'):
+        return num * 100000
+    return num
+
+
+def extract_brochure_text_data(text):
+    """Run smart regex extraction over raw brochure text and return a dict
+    of auto-filled property fields. Missing fields are simply absent."""
+    data = {}
+    if not text:
+        return data
+
+    clean_text = text.replace('\r', '\n')
+
+    # ── BHK / Bedrooms ──
+    m = re.search(r'(\d+(?:\.\d+)?)\s*[- ]?\s*BHK', clean_text, re.I)
+    if m:
+        try:
+            data['bedrooms'] = int(float(m.group(1)))
+        except ValueError:
+            pass
+
+    # ── Price (₹ / Rs / INR ... Cr / Lakh) ──
+    m = re.search(
+        r'(?:₹|Rs\.?|INR|Price\s*[:\-]?)\s*([\d,]+(?:\.\d+)?)\s*'
+        r'(Crores?|Cr\.?|Lakhs?|Lacs?|L\.?)\b',
+        clean_text, re.I)
+    if m:
+        price = _price_to_number(m.group(1), m.group(2))
+        if price:
+            data['price'] = price
+            data['price_unit'] = 'total'
+
+    # ── RERA Number ──
+    m = re.search(
+        r'RERA\s*(?:Reg(?:istration)?\.?\s*)?(?:No\.?|Number|ID)?\s*[:\-]?\s*'
+        r'([A-Z0-9][A-Z0-9\/\-]{5,30})',
+        clean_text, re.I)
+    if m:
+        data['rera_number'] = m.group(1).strip()
+
+    # ── Carpet / Built-up / Super Built-up Area ──
+    m = re.search(
+        r'(Carpet|Built[\s\-]?up|Super\s*Built[\s\-]?up)\s*Area\s*[:\-]?\s*'
+        r'([\d,]+(?:\.\d+)?)\s*(sq\.?\s?ft\.?|sqft|sft|sq\.?\s?m(?:t|tr|eter)?s?\.?|sqm)',
+        clean_text, re.I)
+    if m:
+        try:
+            data['area'] = float(m.group(2).replace(',', ''))
+            data['area_unit'] = 'sqm' if 'm' in m.group(3).lower() else 'sqft'
+        except ValueError:
+            pass
+
+    # ── Possession Date ──
+    m = re.search(
+        r'Possession\s*(?:Date|By|in|On|:)*\s*[:\-]?\s*'
+        r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*[\'’]?\s*\d{2,4}'
+        r'|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4})',
+        clean_text, re.I)
+    if m:
+        data['property_age'] = 'Possession: ' + m.group(1).strip()
+
+    # ── Developer / Builder Name ──
+    m = re.search(
+        r'(?:Developed\s*By|Developer|Builder|Promoter|A\s*Project\s*[Bb]y)\s*[:\-]?\s*'
+        r'([A-Za-z0-9&.,\'\-\s]{3,60})',
+        clean_text, re.I)
+    if m:
+        dev = m.group(1).strip().split('\n')[0].strip(' .,-')
+        if len(dev) > 2:
+            data['developer'] = dev
+
+    # ── Email ──
+    m = re.search(r'[\w.\-]+@[\w\-]+\.[\w.\-]+', clean_text)
+    if m:
+        data['email'] = m.group(0).rstrip('.')
+
+    # ── Website ──
+    m = re.search(r'(?:https?://)?(?:www\.)[\w\-]+\.[a-z]{2,}(?:/[^\s,]*)?', clean_text, re.I)
+    if m:
+        data['website'] = m.group(0).rstrip('.,')
+
+    # ── Contact Phone ──
+    m = re.search(r'(?:\+?91[\-\s]?)?[6-9]\d{9}\b', clean_text)
+    if m:
+        data['contact'] = m.group(0)
+
+    # ── Pincode ──
+    m = re.search(r'\b(\d{6})\b', clean_text)
+    if m:
+        data['pincode'] = m.group(1)
+
+    # ── City (match known Indian cities list) ──
+    for c in INDIAN_CITIES:
+        if re.search(r'\b' + re.escape(c) + r'\b', clean_text, re.I):
+            data['city'] = c
+            break
+
+    # ── Address / Location ──
+    m = re.search(r'(?:Location|Address|Site\s*Address)\s*[:\-]\s*(.+)', clean_text, re.I)
+    if m:
+        addr = m.group(1).strip().split('\n')[0].strip()
+        if len(addr) > 4:
+            data['address'] = addr
+
+    # ── Amenities (look for "Amenities" section header) ──
+    m = re.search(r'Amenities\s*[:\-]?\s*\n(.*?)(?:\n\s*\n|\Z)', clean_text, re.I | re.S)
+    if m:
+        block = m.group(1)
+        items = re.split(r'[•▪●○\-\*\u2022\n,]', block)
+        amenities = []
+        for item in items:
+            item = item.strip(' .')
+            if 2 < len(item) < 40 and not re.search(r'\d{4,}', item):
+                amenities.append(item)
+        if amenities:
+            data['amenities'] = amenities[:15]
+
+    # ── Title (first reasonable standalone line, skip headers/contacts) ──
+    skip_words = ('rera', 'amenities', 'possession', 'location', 'address',
+                   'price', 'carpet', 'built', 'developer', 'contact', 'email')
+    for line in clean_text.split('\n'):
+        line = line.strip()
+        if (10 < len(line) < 80
+                and not re.search(r'@|http|www|\d{10}|\d{6}', line)
+                and not any(w in line.lower() for w in skip_words)):
+            data['title'] = line
+            break
+
+    # ── Description: use first dense paragraph as fallback description ──
+    paragraphs = [p.strip() for p in clean_text.split('\n\n') if len(p.strip()) > 80]
+    if paragraphs:
+        data['description'] = paragraphs[0][:1000]
+
+    return data
+
+
+def extract_brochure_images(pdf_path, dest_folder, max_images=12, min_dim=200):
+    """Extract embedded images from a PDF using PyMuPDF, dedupe, filter out
+    tiny icons/logos, convert to WEBP and save into dest_folder.
+    Returns a list of saved filenames."""
+    import fitz  # PyMuPDF
+
+    saved = []
+    seen_hashes = set()
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception:
+        return saved
+
+    try:
+        for page_index in range(len(doc)):
+            if len(saved) >= max_images:
+                break
+            for img in doc.get_page_images(page_index):
+                if len(saved) >= max_images:
+                    break
+                xref = img[0]
+                try:
+                    base = doc.extract_image(xref)
+                except Exception:
+                    continue
+                image_bytes = base.get('image')
+                width, height = base.get('width', 0), base.get('height', 0)
+                if not image_bytes or width < min_dim or height < min_dim:
+                    continue
+                h = hashlib.md5(image_bytes).hexdigest()
+                if h in seen_hashes:
+                    continue
+                seen_hashes.add(h)
+
+                fname = f"brochure_{uuid.uuid4().hex}.webp"
+                path = os.path.join(dest_folder, fname)
+                try:
+                    img_pil = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+                    img_pil.thumbnail((1200, 900), Image.LANCZOS)
+                    img_pil.save(path, 'WEBP', quality=85, optimize=True)
+                except Exception:
+                    ext = base.get('ext', 'png')
+                    fname = f"brochure_{uuid.uuid4().hex}.{ext}"
+                    path = os.path.join(dest_folder, fname)
+                    try:
+                        with open(path, 'wb') as f:
+                            f.write(image_bytes)
+                    except Exception:
+                        continue
+                saved.append(fname)
+    finally:
+        doc.close()
+
+    return saved
+
+
 # ── PUBLIC ROUTES ────────────────────────────────────────────────────
 
 @app.route('/favicon.ico')
@@ -598,6 +818,63 @@ def owner_properties():
     props=Property.query.order_by(Property.created_at.desc()).paginate(page=page,per_page=20,error_out=False)
     return render_template('owner/properties.html',props=props)
 
+@app.route('/owner/upload-brochure', methods=['POST'])
+@login_required
+@owner_required
+def upload_brochure_extract():
+    """Accept a brochure PDF, extract text + embedded images, and return
+    auto-fill data as JSON for the property form to consume via fetch()."""
+    file = request.files.get('brochure_pdf')
+    if not file or not file.filename:
+        return jsonify({'success': False, 'message': 'No file uploaded.'})
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({'success': False, 'message': 'Please upload a PDF file.'})
+
+    tmp_name = f"{uuid.uuid4().hex}.pdf"
+    tmp_path = os.path.join(app.config['UPLOAD_FOLDER'], 'documents', tmp_name)
+    file.save(tmp_path)
+
+    try:
+        # ── Extract text with pdfplumber ──
+        text = ''
+        try:
+            import pdfplumber
+            with pdfplumber.open(tmp_path) as pdf:
+                for page in pdf.pages[:15]:
+                    page_text = page.extract_text() or ''
+                    text += page_text + '\n'
+        except Exception as e:
+            log_activity('Brochure Extract - Text Failed', str(e))
+
+        fields = extract_brochure_text_data(text)
+
+        # ── Extract images with PyMuPDF ──
+        images = []
+        try:
+            images = extract_brochure_images(
+                tmp_path, os.path.join(app.config['UPLOAD_FOLDER'], 'properties'))
+        except Exception as e:
+            log_activity('Brochure Extract - Images Failed', str(e))
+
+        # Build green/red extraction status map for the UI dots
+        status = {f: bool(fields.get(f)) for f in BROCHURE_TRACKED_FIELDS}
+
+        log_activity('Brochure Auto-Fill', f"{file.filename} - {len(fields)} fields, {len(images)} images")
+
+        return jsonify({
+            'success': True,
+            'fields': fields,
+            'status': status,
+            'images': images,
+            'image_urls': [url_for('static', filename='uploads/properties/' + f) for f in images],
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Extraction failed: {str(e)}'})
+    finally:
+        try: os.remove(tmp_path)
+        except Exception: pass
+
+
 @app.route('/owner/property/add', methods=['GET','POST'])
 @login_required
 @owner_required
@@ -649,6 +926,9 @@ def add_property():
             fn=save_image(img,'properties')
             if fn: db.session.add(PropertyImage(property_id=prop.id,filename=fn,is_primary=first)); first=False
 
+        # Attach images that were extracted from an uploaded brochure PDF
+        _save_extracted_images(prop, has_existing_images=not first)
+
         _save_property_videos(prop)
 
         db.session.commit()
@@ -673,6 +953,24 @@ def _unique_slug(base, model):
     slug=base; n=1
     while model.query.filter_by(slug=slug).first(): slug=f"{base}-{n}"; n+=1
     return slug
+
+def _save_extracted_images(prop, has_existing_images=False):
+    """Attach images that were already extracted from a brochure PDF (and
+    saved to disk by /owner/upload-brochure) to this property as
+    PropertyImage records. The first selected image becomes primary if the
+    property has no images yet."""
+    filenames = request.form.getlist('extracted_images[]')
+    if not filenames:
+        return
+    upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'properties')
+    first = not has_existing_images
+    for fn in filenames:
+        safe_fn = secure_filename(fn)
+        if not safe_fn or not os.path.exists(os.path.join(upload_dir, safe_fn)):
+            continue
+        db.session.add(PropertyImage(property_id=prop.id, filename=safe_fn, is_primary=first))
+        first = False
+
 
 def _save_property_videos(prop):
     """Save YouTube/Vimeo links and uploaded video files for a property"""
@@ -736,6 +1034,9 @@ def edit_property(pid):
         for img in request.files.getlist('images[]'):
             fn=save_image(img,'properties')
             if fn: db.session.add(PropertyImage(property_id=prop.id,filename=fn))
+
+        # Attach images that were extracted from an uploaded brochure PDF
+        _save_extracted_images(prop, has_existing_images=bool(prop.images))
 
         # Brochure upload (manual overrides auto)
         brochure=request.files.get('brochure')
