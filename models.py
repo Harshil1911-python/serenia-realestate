@@ -69,6 +69,7 @@ class Property(db.Model):
     status = db.Column(db.String(30), default='available')  # available, sold, rented, negotiation
     price = db.Column(db.Float, nullable=False)
     price_unit = db.Column(db.String(20), default='total')  # total, per_sqft, per_month
+    currency = db.Column(db.String(10), default='INR')  # INR, AED, USD, GBP, SAR, etc.
     area = db.Column(db.Float, nullable=True)
     area_unit = db.Column(db.String(10), default='sqft')
     bedrooms = db.Column(db.Integer, nullable=True)

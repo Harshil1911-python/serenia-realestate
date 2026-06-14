@@ -87,11 +87,29 @@
 
       <!-- Pricing -->
       <div class="form-section">
-        <h4 class="form-section-title"><i class="fas fa-rupee-sign"></i> Pricing & Size</h4>
+        <h4 class="form-section-title"><i class="fas fa-money-bill-wave"></i> Pricing & Size</h4>
         <div class="form-grid">
           <div class="form-group">
-            <label>Price (₹) * <span class="extract-dot" id="dot-price"></span></label>
+            <label>Currency <span class="extract-dot" id="dot-currency"></span></label>
+            <select name="currency" class="form-input" id="field-currency">
+              {% set cur_options = [
+                ('INR','₹ INR — Indian Rupee'),
+                ('AED','AED — UAE Dirham'),
+                ('USD','$ USD — US Dollar'),
+                ('GBP','£ GBP — British Pound'),
+                ('EUR','€ EUR — Euro'),
+                ('SAR','SAR — Saudi Riyal'),
+                ('QAR','QAR — Qatari Riyal'),
+              ] %}
+              {% for code, label in cur_options %}
+              <option value="{{ code }}" {% if (prop and prop.currency == code) or (not prop and code == 'INR') %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Price * <span class="extract-dot" id="dot-price"></span></label>
             <input type="number" name="price" required class="form-input" value="{{ prop.price if prop else '' }}" placeholder="5000000" id="field-price">
+            <small class="form-hint">For INR, enter the full number (e.g. 8500000 for ₹85 Lakh). For AED/USD/etc., enter the full amount directly.</small>
           </div>
           <div class="form-group">
             <label>Price Unit</label>
@@ -404,7 +422,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // ── BROCHURE AUTO-FILL EXTRACTION ──
-const BROCHURE_TRACKED_FIELDS = ['title','bedrooms','price','area','area_unit','address','city',
+const BROCHURE_TRACKED_FIELDS = ['title','bedrooms','price','currency','area','area_unit','address','city',
   'pincode','property_age','amenities','rera_number','developer','contact','email','website','description'];
 
 // Initialize all dots to red (not extracted) on page load for tracked fields
@@ -425,6 +443,16 @@ async function extractBrochure() {
     return;
   }
 
+  const file = fileInput.files[0];
+  const sizeMb = file.size / (1024 * 1024);
+  if (sizeMb > 45) {
+    statusEl.innerHTML = `<span style="color:#ef4444"><i class="fas fa-exclamation-circle"></i> This file is ${sizeMb.toFixed(1)}MB — please use a PDF under 45MB (try compressing it).</span>`;
+    return;
+  }
+  if (sizeMb > 15) {
+    statusEl.innerHTML = `<span style="color:#64748b"><i class="fas fa-spinner fa-spin"></i> This is a large file (${sizeMb.toFixed(1)}MB) — extraction may take up to a minute...</span>`;
+  }
+
   const formData = new FormData();
   formData.append('brochure_pdf', fileInput.files[0]);
   formData.append('csrf_token', '{{ csrf_token() }}');
@@ -434,7 +462,10 @@ async function extractBrochure() {
   statusEl.innerHTML = '<span style="color:#64748b"><i class="fas fa-spinner fa-spin"></i> Reading brochure, this may take a moment...</span>';
 
   try {
-    const res = await fetch('{{ url_for("upload_brochure_extract") }}', { method: 'POST', body: formData });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 75000); // 75s client timeout
+    const res = await fetch('{{ url_for("upload_brochure_extract") }}', { method: 'POST', body: formData, signal: controller.signal });
+    clearTimeout(timeoutId);
     const data = await res.json();
 
     if (!data.success) {
@@ -450,9 +481,23 @@ async function extractBrochure() {
 
     const filledCount = Object.values(data.status || {}).filter(Boolean).length;
     const totalCount = Object.keys(data.status || {}).length;
-    statusEl.innerHTML = `<span style="color:#22c55e"><i class="fas fa-check-circle"></i> Extracted ${filledCount}/${totalCount} fields and ${(data.images||[]).length} photo(s). Review the dots below.</span>`;
+
+    let statusHtml = `<span style="color:#22c55e"><i class="fas fa-check-circle"></i> Extracted ${filledCount}/${totalCount} fields and ${(data.images||[]).length} photo(s).</span>`;
+    if (data.partial && data.message) {
+      statusHtml += `<br><span style="color:#f59e0b"><i class="fas fa-exclamation-triangle"></i> ${data.message}</span>`;
+    } else {
+      statusHtml += ` Review the dots below.`;
+    }
+    if (data.file_size_mb) {
+      statusHtml += `<br><small style="color:#94a3b8">File: ${data.file_size_mb}MB${data.pages_total ? ' · ' + data.pages_total + ' pages (scanned ' + data.pages_scanned + ')' : ''}</small>`;
+    }
+    statusEl.innerHTML = statusHtml;
   } catch (err) {
-    statusEl.innerHTML = '<span style="color:#ef4444"><i class="fas fa-exclamation-circle"></i> Extraction failed. Please try again.</span>';
+    if (err.name === 'AbortError') {
+      statusEl.innerHTML = '<span style="color:#ef4444"><i class="fas fa-exclamation-circle"></i> Extraction took too long and was cancelled. Try a smaller/simpler PDF, or fill the form manually.</span>';
+    } else {
+      statusEl.innerHTML = '<span style="color:#ef4444"><i class="fas fa-exclamation-circle"></i> Extraction failed. Please try again.</span>';
+    }
   }
 
   btn.disabled = false;
@@ -466,7 +511,6 @@ function applyExtractedFields(fields, status) {
     'bedrooms': 'field-bedrooms',
     'price': 'field-price',
     'area': 'field-area',
-    'area_unit': 'field-area_unit',
     'address': 'addressInput',
     'city': 'field-city',
     'pincode': 'field-pincode',
@@ -480,6 +524,21 @@ function applyExtractedFields(fields, status) {
       if (!el.value || el.value.trim() === '') {
         el.value = fields[key];
       }
+    }
+  }
+
+  // Select (dropdown) fields - currency & area_unit. These always have a
+  // default value, so we apply the extracted value whenever it was found
+  // (the owner can still change the dropdown afterwards).
+  const selectFields = {
+    'currency': 'field-currency',
+    'area_unit': 'field-area_unit',
+  };
+  for (const [key, elId] of Object.entries(selectFields)) {
+    const el = document.getElementById(elId);
+    if (el && fields[key]) {
+      const optionExists = [...el.options].some(o => o.value === fields[key]);
+      if (optionExists) el.value = fields[key];
     }
   }
 

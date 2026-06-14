@@ -226,13 +226,79 @@ def clean(s, tags=None):
     allowed = tags or []
     return bleach.clean(s or '', tags=allowed, strip=True)
 
-def format_price_str(price, unit='total'):
-    if price >= 10000000: txt = f"₹ {price/10000000:.2f} Cr"
-    elif price >= 100000: txt = f"₹ {price/100000:.2f} Lakh"
-    else: txt = f"₹ {price:,.0f}"
+# ── CURRENCY HELPERS ───────────────────────────────────────────────────
+
+CURRENCY_SYMBOLS = {
+    'INR': '₹', 'AED': 'AED', 'USD': '$', 'GBP': '£', 'EUR': '€',
+    'SAR': 'SAR', 'QAR': 'QAR',
+}
+
+# Currencies that use the Indian lakh/crore short-form display.
+# All others (AED, USD, etc.) display the full grouped number.
+LAKH_CRORE_CURRENCIES = {'INR'}
+
+def format_price_str(price, unit='total', currency='INR'):
+    """Format a raw numeric price for display with the correct currency
+    symbol/code. INR uses Lakh/Crore short-forms; other currencies (AED,
+    USD, SAR, etc.) show the full grouped amount with their symbol/code."""
+    if price is None:
+        price = 0
+    currency = (currency or 'INR').upper()
+    symbol = CURRENCY_SYMBOLS.get(currency, currency)
+
+    if currency in LAKH_CRORE_CURRENCIES:
+        if price >= 10000000:
+            txt = f"{symbol} {price/10000000:.2f} Cr"
+        elif price >= 100000:
+            txt = f"{symbol} {price/100000:.2f} Lakh"
+        else:
+            txt = f"{symbol} {price:,.0f}"
+    else:
+        # AED / USD / SAR / etc: show full amount with symbol/code prefix
+        if symbol in ('$', '£', '€'):
+            txt = f"{symbol}{price:,.0f}"
+        else:
+            txt = f"{symbol} {price:,.0f}"
+
     if unit == 'per_month': txt += " / month"
     elif unit == 'per_sqft': txt += " / sqft"
     return txt
+
+
+def format_price_compact(price, currency='INR'):
+    """Shorter form used on cards/markers — e.g. '₹1.2 Cr', 'AED 1.25M'."""
+    if price is None:
+        price = 0
+    currency = (currency or 'INR').upper()
+    symbol = CURRENCY_SYMBOLS.get(currency, currency)
+
+    if currency in LAKH_CRORE_CURRENCIES:
+        if price >= 10000000:
+            return f"{symbol}{price/10000000:.1f}Cr"
+        elif price >= 100000:
+            return f"{symbol}{price/100000:.1f}L"
+        return f"{symbol}{price:,.0f}"
+    else:
+        if price >= 1_000_000:
+            val = f"{symbol}{price/1_000_000:.1f}M" if symbol in ('$','£','€') else f"{symbol} {price/1_000_000:.1f}M"
+        else:
+            val = f"{symbol}{price:,.0f}" if symbol in ('$','£','€') else f"{symbol} {price:,.0f}"
+        return val
+
+
+@app.template_filter('price')
+def jinja_format_price(price, unit='total', currency='INR'):
+    return format_price_str(price, unit, currency)
+
+
+@app.template_filter('price_compact')
+def jinja_format_price_compact(price, currency='INR'):
+    return format_price_compact(price, currency)
+
+
+@app.template_filter('currency_symbol')
+def jinja_currency_symbol(currency):
+    return CURRENCY_SYMBOLS.get((currency or 'INR').upper(), currency)
 
 def generate_brochure_pdf(prop):
     """Auto-generate a professional PDF brochure for a property using reportlab"""
@@ -283,7 +349,7 @@ def generate_brochure_pdf(prop):
         except Exception: pass
 
     # Price
-    elements.append(Paragraph(format_price_str(prop.price, prop.price_unit), price_style))
+    elements.append(Paragraph(format_price_str(prop.price, prop.price_unit, prop.currency), price_style))
     elements.append(Spacer(1, 8))
 
     # Key details table
@@ -361,10 +427,17 @@ def generate_brochure_pdf(prop):
 
 # Fields tracked for the green/red "extraction status" dots in the UI
 BROCHURE_TRACKED_FIELDS = [
-    'title', 'bedrooms', 'price', 'area', 'area_unit', 'address', 'city',
+    'title', 'bedrooms', 'price', 'currency', 'area', 'area_unit', 'address', 'city',
     'pincode', 'property_age', 'amenities', 'rera_number', 'developer',
     'contact', 'email', 'website', 'description',
 ]
+
+# Limits applied when processing large brochure PDFs so a huge file
+# (50+ pages, lots of embedded images) cannot hang or crash a worker.
+BROCHURE_MAX_PAGES_TEXT = 25       # max pages to run text extraction on
+BROCHURE_MAX_PAGES_IMAGES = 30     # max pages to scan for images
+BROCHURE_MAX_TIME_SECONDS = 45     # hard wall-clock budget for the whole extraction
+BROCHURE_MAX_TEXT_CHARS = 400_000  # cap collected text to avoid huge regex scans
 
 INDIAN_CITIES = [
     'Mumbai','Navi Mumbai','Thane','Pune','Bengaluru','Bangalore','Delhi','New Delhi',
@@ -374,18 +447,58 @@ INDIAN_CITIES = [
     'Faridabad','Ghaziabad','Patna','Vapi','Vasai','Mira Road','Kalyan',
 ]
 
+UAE_CITIES = [
+    'Dubai','Abu Dhabi','Sharjah','Ajman','Ras Al Khaimah','Ras Al-Khaimah',
+    'Fujairah','Umm Al Quwain','Umm Al-Quwain', 'Al Ain',
+]
+
+OTHER_CITIES = [
+    'Doha','Riyadh','Jeddah','Manama','Muscat','Kuwait City','London',
+    'New York','Singapore','Toronto','Dubai Marina','Business Bay',
+    'Downtown Dubai','Jumeirah','JVC','JLT','Palm Jumeirah',
+]
+
+ALL_CITIES = INDIAN_CITIES + UAE_CITIES + OTHER_CITIES
+
+# Currency symbol/keyword -> ISO code, and the "lakh/crore" style multiplier
+# words that apply to each currency (Indian-style units only apply to INR;
+# AED/USD/etc. brochures normally state the full number directly).
+CURRENCY_PATTERNS = [
+    # (regex for symbol/code, ISO code, supports lakh/crore words)
+    (r'AED|Dhs?\.?|د\.إ', 'AED', False),
+    (r'USD|US\$|\$', 'USD', False),
+    (r'SAR|SR\b', 'SAR', False),
+    (r'QAR', 'QAR', False),
+    (r'GBP|£', 'GBP', False),
+    (r'EUR|€', 'EUR', False),
+    (r'₹|Rs\.?|INR', 'INR', True),
+]
+
+# Multiplier words for "lakh/crore" style numbers (used for INR, and also
+# harmlessly checked for other currencies in case a brochure mixes styles)
+MULTIPLIER_WORDS = r'(Crores?|Cr\.?|Lakhs?|Lacs?|L\.?|Million|Mn|M\b|Thousand|K\b)'
+
+
+def _apply_multiplier(num, word):
+    word = (word or '').strip().lower()
+    if word.startswith('cr'):
+        return num * 10_000_000
+    if word.startswith('l'):
+        return num * 100_000
+    if word.startswith('m'):
+        return num * 1_000_000
+    if word.startswith('k') or word.startswith('th'):
+        return num * 1_000
+    return num
+
+
 def _price_to_number(value, unit):
-    """Convert a price string + unit (Cr/Lakh) to a raw rupee number."""
+    """Convert a price string + optional multiplier word to a raw number."""
     try:
         num = float(value.replace(',', '').strip())
     except (ValueError, AttributeError):
         return None
-    unit = (unit or '').lower()
-    if unit.startswith('cr'):
-        return num * 10000000
-    if unit.startswith('l') or unit.startswith('lac'):
-        return num * 100000
-    return num
+    return _apply_multiplier(num, unit)
 
 
 def extract_brochure_text_data(text):
@@ -395,7 +508,14 @@ def extract_brochure_text_data(text):
     if not text:
         return data
 
+    # Cap text length so regex scans on huge brochures stay fast.
+    if len(text) > BROCHURE_MAX_TEXT_CHARS:
+        text = text[:BROCHURE_MAX_TEXT_CHARS]
+
     clean_text = text.replace('\r', '\n')
+    # Collapse excessive blank lines (common in PDF text dumps) but keep
+    # paragraph breaks for the description/amenities heuristics below.
+    clean_text = re.sub(r'\n{3,}', '\n\n', clean_text)
 
     # ── BHK / Bedrooms ──
     m = re.search(r'(\d+(?:\.\d+)?)\s*[- ]?\s*BHK', clean_text, re.I)
@@ -404,43 +524,109 @@ def extract_brochure_text_data(text):
             data['bedrooms'] = int(float(m.group(1)))
         except ValueError:
             pass
+    else:
+        # "Studio" / "1 Bedroom" / "2 Bedrooms" style (common in AED/Gulf brochures)
+        m = re.search(r'\bStudio\b', clean_text, re.I)
+        if m:
+            data['bedrooms'] = 0
+        else:
+            m = re.search(r'(\d+)\s*[- ]?\s*Bed(?:room)?s?\b', clean_text, re.I)
+            if m:
+                try:
+                    data['bedrooms'] = int(m.group(1))
+                except ValueError:
+                    pass
 
-    # ── Price (₹ / Rs / INR ... Cr / Lakh) ──
-    m = re.search(
-        r'(?:₹|Rs\.?|INR|Price\s*[:\-]?)\s*([\d,]+(?:\.\d+)?)\s*'
-        r'(Crores?|Cr\.?|Lakhs?|Lacs?|L\.?)\b',
-        clean_text, re.I)
-    if m:
-        price = _price_to_number(m.group(1), m.group(2))
-        if price:
-            data['price'] = price
-            data['price_unit'] = 'total'
+    # ── Price (multi-currency: ₹/Rs/INR, AED/Dhs, USD/$, SAR, QAR, GBP, EUR) ──
+    price_found = False
+    for sym_pattern, code, supports_multiplier in CURRENCY_PATTERNS:
+        if supports_multiplier:
+            # e.g. "₹ 85 Lakhs", "Rs. 1.25 Cr", "INR 45 Lacs"
+            m = re.search(
+                rf'(?:{sym_pattern})\s*([\d,]+(?:\.\d+)?)\s*{MULTIPLIER_WORDS}\b',
+                clean_text, re.I)
+            if m:
+                price = _price_to_number(m.group(1), m.group(2))
+                if price:
+                    data['price'] = price
+                    data['price_unit'] = 'total'
+                    data['currency'] = code
+                    price_found = True
+                    break
+        # Plain "AED 1,250,000" / "USD 350,000" / "$ 1,200,000" style
+        m = re.search(
+            rf'(?:{sym_pattern})\s*([\d,]{{4,}}(?:\.\d+)?)\b',
+            clean_text)
+        if m:
+            try:
+                price = float(m.group(1).replace(',', ''))
+            except ValueError:
+                price = None
+            if price and price >= 1000:
+                data['price'] = price
+                data['price_unit'] = 'total'
+                data['currency'] = code
+                price_found = True
+                break
 
-    # ── RERA Number ──
+    if not price_found:
+        # Fallback: bare lakh/crore figure with no visible currency symbol
+        # (assume INR, the most common case for these terms)
+        m = re.search(rf'([\d,]+(?:\.\d+)?)\s*{MULTIPLIER_WORDS}\b', clean_text, re.I)
+        if m:
+            price = _price_to_number(m.group(1), m.group(2))
+            if price:
+                data['price'] = price
+                data['price_unit'] = 'total'
+                data['currency'] = 'INR'
+
+    # ── RERA Number (India) or DLD/Permit Number (UAE) ──
     m = re.search(
         r'RERA\s*(?:Reg(?:istration)?\.?\s*)?(?:No\.?|Number|ID)?\s*[:\-]?\s*'
         r'([A-Z0-9][A-Z0-9\/\-]{5,30})',
         clean_text, re.I)
     if m:
         data['rera_number'] = m.group(1).strip()
+    else:
+        m = re.search(
+            r'(?:DLD|Permit|Trakheesi)\s*(?:No\.?|Number)?\s*[:\-]?\s*'
+            r'([A-Z0-9][A-Z0-9\/\-]{5,30})',
+            clean_text, re.I)
+        if m:
+            data['rera_number'] = m.group(1).strip()
 
-    # ── Carpet / Built-up / Super Built-up Area ──
+    # ── Carpet / Built-up / Super Built-up / Saleable Area ──
     m = re.search(
-        r'(Carpet|Built[\s\-]?up|Super\s*Built[\s\-]?up)\s*Area\s*[:\-]?\s*'
-        r'([\d,]+(?:\.\d+)?)\s*(sq\.?\s?ft\.?|sqft|sft|sq\.?\s?m(?:t|tr|eter)?s?\.?|sqm)',
+        r'(Carpet|Built[\s\-]?up|Super\s*Built[\s\-]?up|Saleable|Plot|Gross|Net)\s*Area\s*'
+        r'(?:\(.*?\))?\s*[:\-]?\s*'
+        r'([\d,]+(?:\.\d+)?)\s*(sq\.?\s?ft\.?|sqft|sft|ft²|sq\.?\s?m(?:t|tr|eter)?s?\.?|sqm|m²)',
         clean_text, re.I)
     if m:
         try:
             data['area'] = float(m.group(2).replace(',', ''))
-            data['area_unit'] = 'sqm' if 'm' in m.group(3).lower() else 'sqft'
+            unit_str = m.group(3).lower()
+            data['area_unit'] = 'sqm' if ('m' in unit_str and 'sq' in unit_str) or '²' in unit_str and 'f' not in unit_str else ('sqm' if 'm' in unit_str else 'sqft')
         except ValueError:
             pass
+    else:
+        # Generic "Area: 1,200 sq ft" / "Size: 85 sqm" without a Carpet/Built-up prefix
+        m = re.search(
+            r'(?:Area|Size)\s*[:\-]?\s*([\d,]+(?:\.\d+)?)\s*'
+            r'(sq\.?\s?ft\.?|sqft|sft|ft²|sq\.?\s?m(?:t|tr|eter)?s?\.?|sqm|m²)',
+            clean_text, re.I)
+        if m:
+            try:
+                data['area'] = float(m.group(1).replace(',', ''))
+                unit_str = m.group(2).lower()
+                data['area_unit'] = 'sqm' if 'm' in unit_str else 'sqft'
+            except ValueError:
+                pass
 
-    # ── Possession Date ──
+    # ── Possession / Handover Date ──
     m = re.search(
-        r'Possession\s*(?:Date|By|in|On|:)*\s*[:\-]?\s*'
+        r'(?:Possession|Handover)\s*(?:Date|By|in|On|:)*\s*[:\-]?\s*'
         r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*[\'’]?\s*\d{2,4}'
-        r'|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4})',
+        r'|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|Q[1-4]\s*\d{4}|\d{4})',
         clean_text, re.I)
     if m:
         data['property_age'] = 'Possession: ' + m.group(1).strip()
@@ -465,18 +651,27 @@ def extract_brochure_text_data(text):
     if m:
         data['website'] = m.group(0).rstrip('.,')
 
-    # ── Contact Phone ──
+    # ── Contact Phone (India +91, UAE +971, generic international) ──
     m = re.search(r'(?:\+?91[\-\s]?)?[6-9]\d{9}\b', clean_text)
     if m:
         data['contact'] = m.group(0)
+    else:
+        m = re.search(r'(?:\+?971[\-\s]?)?(?:0)?5\d[\-\s]?\d{3}[\-\s]?\d{4}\b', clean_text)
+        if m:
+            data['contact'] = m.group(0)
+        else:
+            # Generic international number with country code, 8-15 digits
+            m = re.search(r'\+\d{1,3}[\-\s]?\d[\d\-\s]{6,13}\d', clean_text)
+            if m:
+                data['contact'] = m.group(0).strip()
 
-    # ── Pincode ──
+    # ── Pincode / Postal Code (India 6-digit; skipped for UAE - no postal codes) ──
     m = re.search(r'\b(\d{6})\b', clean_text)
     if m:
         data['pincode'] = m.group(1)
 
-    # ── City (match known Indian cities list) ──
-    for c in INDIAN_CITIES:
+    # ── City (match known city list across India / UAE / GCC / global hubs) ──
+    for c in ALL_CITIES:
         if re.search(r'\b' + re.escape(c) + r'\b', clean_text, re.I):
             data['city'] = c
             break
@@ -488,8 +683,10 @@ def extract_brochure_text_data(text):
         if len(addr) > 4:
             data['address'] = addr
 
-    # ── Amenities (look for "Amenities" section header) ──
-    m = re.search(r'Amenities\s*[:\-]?\s*\n(.*?)(?:\n\s*\n|\Z)', clean_text, re.I | re.S)
+    # ── Amenities (look for "Amenities"/"Facilities"/"Features" section header) ──
+    m = re.search(
+        r'(?:Amenities|Facilities|Features|Specifications)\s*[:\-]?\s*\n(.*?)(?:\n\s*\n|\Z)',
+        clean_text, re.I | re.S)
     if m:
         block = m.group(1)
         items = re.split(r'[•▪●○\-\*\u2022\n,]', block)
@@ -502,8 +699,9 @@ def extract_brochure_text_data(text):
             data['amenities'] = amenities[:15]
 
     # ── Title (first reasonable standalone line, skip headers/contacts) ──
-    skip_words = ('rera', 'amenities', 'possession', 'location', 'address',
-                   'price', 'carpet', 'built', 'developer', 'contact', 'email')
+    skip_words = ('rera', 'amenities', 'facilities', 'possession', 'handover',
+                   'location', 'address', 'price', 'carpet', 'built', 'developer',
+                   'contact', 'email', 'dld', 'permit')
     for line in clean_text.split('\n'):
         line = line.strip()
         if (10 < len(line) < 80
@@ -520,11 +718,25 @@ def extract_brochure_text_data(text):
     return data
 
 
-def extract_brochure_images(pdf_path, dest_folder, max_images=12, min_dim=200):
+def extract_brochure_images(pdf_path, dest_folder, max_images=12, min_dim=200,
+                             max_pages=None, deadline=None):
     """Extract embedded images from a PDF using PyMuPDF, dedupe, filter out
     tiny icons/logos, convert to WEBP and save into dest_folder.
-    Returns a list of saved filenames."""
+
+    Safe for large PDFs:
+    - Only scans up to `max_pages` pages (default BROCHURE_MAX_PAGES_IMAGES)
+    - Stops early once `deadline` (a time.monotonic() value) is passed
+    - Skips absurdly large embedded images that could blow up memory
+
+    Returns a list of saved filenames.
+    """
     import fitz  # PyMuPDF
+    import time
+
+    if max_pages is None:
+        max_pages = BROCHURE_MAX_PAGES_IMAGES
+
+    MAX_RAW_IMAGE_BYTES = 15 * 1024 * 1024  # skip individual images >15MB raw
 
     saved = []
     seen_hashes = set()
@@ -534,21 +746,39 @@ def extract_brochure_images(pdf_path, dest_folder, max_images=12, min_dim=200):
         return saved
 
     try:
-        for page_index in range(len(doc)):
+        page_count = min(len(doc), max_pages)
+        for page_index in range(page_count):
             if len(saved) >= max_images:
                 break
-            for img in doc.get_page_images(page_index):
+            if deadline is not None and time.monotonic() > deadline:
+                break
+
+            try:
+                page_images = doc.get_page_images(page_index)
+            except Exception:
+                continue
+
+            for img in page_images:
                 if len(saved) >= max_images:
                     break
+                if deadline is not None and time.monotonic() > deadline:
+                    break
+
                 xref = img[0]
                 try:
                     base = doc.extract_image(xref)
                 except Exception:
                     continue
+
                 image_bytes = base.get('image')
                 width, height = base.get('width', 0), base.get('height', 0)
-                if not image_bytes or width < min_dim or height < min_dim:
+                if not image_bytes:
                     continue
+                if width < min_dim or height < min_dim:
+                    continue
+                if len(image_bytes) > MAX_RAW_IMAGE_BYTES:
+                    continue
+
                 h = hashlib.md5(image_bytes).hexdigest()
                 if h in seen_hashes:
                     continue
@@ -574,6 +804,42 @@ def extract_brochure_images(pdf_path, dest_folder, max_images=12, min_dim=200):
         doc.close()
 
     return saved
+
+
+def extract_brochure_tables_text(pdf_path, max_pages=None, deadline=None):
+    """Extract text from tables in a PDF (common in larger/denser brochures
+    for specification sheets, amenities lists, payment plans, etc.) and
+    flatten it into plain text lines so the regex extractor can pick up
+    fields that live inside tables rather than free-flowing text.
+
+    Safe for large PDFs via max_pages / deadline limits.
+    """
+    import time
+    if max_pages is None:
+        max_pages = BROCHURE_MAX_PAGES_TEXT
+
+    lines = []
+    try:
+        import pdfplumber
+        with pdfplumber.open(pdf_path) as pdf:
+            page_count = min(len(pdf.pages), max_pages)
+            for page in pdf.pages[:page_count]:
+                if deadline is not None and time.monotonic() > deadline:
+                    break
+                try:
+                    tables = page.extract_tables()
+                except Exception:
+                    tables = []
+                for table in tables:
+                    for row in table:
+                        cells = [str(c).strip() for c in row if c]
+                        if cells:
+                            lines.append('  '.join(cells))
+    except Exception:
+        pass
+
+    return '\n'.join(lines)
+
 
 
 # ── PUBLIC ROUTES ────────────────────────────────────────────────────
@@ -620,7 +886,9 @@ def properties():
     cities = [c[0] for c in db.session.query(Property.city).distinct().filter(Property.city.isnot(None)).all() if c[0]]
     all_props_geo = q.filter(Property.latitude.isnot(None), Property.longitude.isnot(None)).limit(200).all()
     geo_data = [{'id':p.id,'title':p.title,'lat':p.latitude,'lng':p.longitude,
-                 'price':p.price,'type':p.property_type,'status':p.status,
+                 'price':p.price,'currency':p.currency or 'INR',
+                 'price_label': format_price_compact(p.price, p.currency),
+                 'type':p.property_type,'status':p.status,
                  'img': (url_for('static',filename='uploads/properties/'+p.images[0].filename) if p.images else ''),
                  'url': url_for('property_detail',slug=p.slug)} for p in all_props_geo]
     return render_template('public/properties.html', props=props, cities=cities,
@@ -823,7 +1091,15 @@ def owner_properties():
 @owner_required
 def upload_brochure_extract():
     """Accept a brochure PDF, extract text + embedded images, and return
-    auto-fill data as JSON for the property form to consume via fetch()."""
+    auto-fill data as JSON for the property form to consume via fetch().
+
+    Designed to handle large brochure PDFs (many pages / high-res images)
+    without hanging a worker: page counts are capped, a wall-clock deadline
+    is enforced across the whole extraction, and oversized embedded images
+    are skipped rather than loaded fully into memory.
+    """
+    import time
+
     file = request.files.get('brochure_pdf')
     if not file or not file.filename:
         return jsonify({'success': False, 'message': 'No file uploaded.'})
@@ -834,32 +1110,97 @@ def upload_brochure_extract():
     tmp_path = os.path.join(app.config['UPLOAD_FOLDER'], 'documents', tmp_name)
     file.save(tmp_path)
 
+    # Reject absurdly large files outright (also bounded by MAX_CONTENT_LENGTH,
+    # but give a friendlier message for brochure-specific limits)
     try:
-        # ── Extract text with pdfplumber ──
+        size_mb = os.path.getsize(tmp_path) / (1024 * 1024)
+    except OSError:
+        size_mb = 0
+    if size_mb > 45:
+        try: os.remove(tmp_path)
+        except Exception: pass
+        return jsonify({'success': False,
+                         'message': f'This PDF is {size_mb:.1f}MB, which is too large to '
+                                     f'process (max ~45MB). Please compress the brochure '
+                                     f'or split it into smaller files.'})
+
+    # Overall wall-clock budget for this request (text + tables + images)
+    deadline = time.monotonic() + BROCHURE_MAX_TIME_SECONDS
+
+    try:
+        file_size_mb = round(os.path.getsize(tmp_path) / (1024 * 1024), 2)
+
+        # ── Determine page count up front so we can scale limits ──
+        total_pages = None
+        try:
+            import fitz
+            with fitz.open(tmp_path) as _doc:
+                total_pages = len(_doc)
+        except Exception:
+            pass
+
+        # ── Extract text with pdfplumber (page-capped) ──
         text = ''
+        pages_read = 0
         try:
             import pdfplumber
             with pdfplumber.open(tmp_path) as pdf:
-                for page in pdf.pages[:15]:
-                    page_text = page.extract_text() or ''
+                page_count = min(len(pdf.pages), BROCHURE_MAX_PAGES_TEXT)
+                for page in pdf.pages[:page_count]:
+                    if time.monotonic() > deadline:
+                        break
+                    try:
+                        page_text = page.extract_text() or ''
+                    except Exception:
+                        page_text = ''
                     text += page_text + '\n'
+                    pages_read += 1
+                    if len(text) > BROCHURE_MAX_TEXT_CHARS:
+                        break
         except Exception as e:
             log_activity('Brochure Extract - Text Failed', str(e))
 
+        # ── Also pull text out of tables (specs/amenities often live here) ──
+        if time.monotonic() < deadline:
+            try:
+                table_text = extract_brochure_tables_text(tmp_path, deadline=deadline)
+                if table_text:
+                    text += '\n' + table_text
+            except Exception as e:
+                log_activity('Brochure Extract - Table Text Failed', str(e))
+
         fields = extract_brochure_text_data(text)
 
-        # ── Extract images with PyMuPDF ──
+        # ── Extract images with PyMuPDF (page-capped + time-capped) ──
         images = []
         try:
             images = extract_brochure_images(
-                tmp_path, os.path.join(app.config['UPLOAD_FOLDER'], 'properties'))
+                tmp_path, os.path.join(app.config['UPLOAD_FOLDER'], 'properties'),
+                deadline=deadline)
         except Exception as e:
             log_activity('Brochure Extract - Images Failed', str(e))
 
         # Build green/red extraction status map for the UI dots
         status = {f: bool(fields.get(f)) for f in BROCHURE_TRACKED_FIELDS}
 
-        log_activity('Brochure Auto-Fill', f"{file.filename} - {len(fields)} fields, {len(images)} images")
+        timed_out = time.monotonic() > deadline
+        truncated = (total_pages is not None and total_pages > BROCHURE_MAX_PAGES_TEXT)
+
+        log_activity('Brochure Auto-Fill',
+                      f"{file.filename} ({file_size_mb}MB, {total_pages} pages) - "
+                      f"{len(fields)} fields, {len(images)} images"
+                      f"{' [partial: large file]' if (timed_out or truncated) else ''}")
+
+        message = None
+        if timed_out:
+            message = ('This brochure is large, so extraction stopped early to avoid timing out. '
+                        'Results below are from the portion that was processed — '
+                        'please review and complete any remaining fields manually.')
+        elif truncated:
+            message = (f'This brochure has {total_pages} pages — only the first '
+                        f'{BROCHURE_MAX_PAGES_TEXT} were scanned for text/data and the first '
+                        f'{BROCHURE_MAX_PAGES_IMAGES} for images. Please review extracted '
+                        f'fields and add anything from later pages manually.')
 
         return jsonify({
             'success': True,
@@ -867,9 +1208,15 @@ def upload_brochure_extract():
             'status': status,
             'images': images,
             'image_urls': [url_for('static', filename='uploads/properties/' + f) for f in images],
+            'partial': bool(timed_out or truncated),
+            'message': message,
+            'pages_total': total_pages,
+            'pages_scanned': pages_read,
+            'file_size_mb': file_size_mb,
         })
     except Exception as e:
         return jsonify({'success': False, 'message': f'Extraction failed: {str(e)}'})
+
     finally:
         try: os.remove(tmp_path)
         except Exception: pass
@@ -892,6 +1239,7 @@ def add_property():
             status=request.form.get('status','available'),
             price=float(request.form.get('price',0) or 0),
             price_unit=request.form.get('price_unit','total'),
+            currency=request.form.get('currency','INR'),
             area=float(request.form.get('area',0) or 0),
             area_unit=request.form.get('area_unit','sqft'),
             bedrooms=int(request.form.get('bedrooms',0) or 0) or None,
@@ -1009,6 +1357,7 @@ def edit_property(pid):
         prop.status=request.form.get('status','available')
         prop.price=float(request.form.get('price',0) or 0)
         prop.price_unit=request.form.get('price_unit','total')
+        prop.currency=request.form.get('currency','INR')
         prop.area=float(request.form.get('area',0) or 0)
         prop.area_unit=request.form.get('area_unit','sqft')
         prop.bedrooms=int(request.form.get('bedrooms',0) or 0) or None
@@ -1614,6 +1963,7 @@ def run_auto_migrations():
         'properties': {
             'brochure_auto': 'BOOLEAN DEFAULT 0',
             'public_link_enabled': 'BOOLEAN DEFAULT 1',
+            'currency': "VARCHAR(10) DEFAULT 'INR'",
         },
         'users': {
             'totp_secret': 'VARCHAR(32)',

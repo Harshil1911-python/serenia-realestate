@@ -136,11 +136,7 @@
               {% endif %}
               <div class="similar-info">
                 <p>{{ sp.title[:40] }}</p>
-                <span>
-                  {% if sp.price >= 10000000 %}₹{{ "%.1f"|format(sp.price/10000000) }}Cr
-                  {% elif sp.price >= 100000 %}₹{{ "%.1f"|format(sp.price/100000) }}L
-                  {% else %}₹{{ "{:,.0f}".format(sp.price) }}{% endif %}
-                </span>
+                <span>{{ sp.price|price_compact(sp.currency) }}</span>
               </div>
             </a>
             {% endfor %}
@@ -156,9 +152,7 @@
           <div class="price-header">
             <div>
               <p class="price-amount">
-                {% if prop.price >= 10000000 %}₹{{ "%.2f"|format(prop.price/10000000) }} Cr
-                {% elif prop.price >= 100000 %}₹{{ "%.2f"|format(prop.price/100000) }} L
-                {% else %}₹{{ "{:,.0f}".format(prop.price) }}{% endif %}
+                {{ prop.price|price(prop.price_unit, prop.currency) }}
               </p>
               <p class="price-unit">{{ prop.listing_type|title }} · {{ prop.property_type }}</p>
             </div>

@@ -33,9 +33,7 @@
             </td>
             <td>{{ prop.property_type }}</td>
             <td>
-              {% if prop.price >= 10000000 %}₹{{ "%.1f"|format(prop.price/10000000) }}Cr
-              {% elif prop.price >= 100000 %}₹{{ "%.1f"|format(prop.price/100000) }}L
-              {% else %}₹{{ "{:,.0f}".format(prop.price) }}{% endif %}
+              {{ prop.price|price_compact(prop.currency) }}
             </td>
             <td>{{ prop.city or '—' }}</td>
             <td><span class="status-pill status-{{ prop.status }}">{{ prop.status|title }}</span></td>
