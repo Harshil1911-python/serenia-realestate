@@ -14,6 +14,9 @@
     {% if prop.is_featured %}
       <span class="featured-tag"><i class="fas fa-star"></i> Featured</span>
     {% endif %}
+    {% if prop.is_builder_project %}
+      <span class="builder-tag"><i class="fas fa-city"></i> Builder Project</span>
+    {% endif %}
   </div>
   <div class="prop-body">
     <p class="prop-type">{{ prop.property_type }}</p>
@@ -27,8 +30,12 @@
     </div>
     <div class="prop-footer">
       <div class="prop-price">
-        {{ prop.price|price_compact(prop.currency) }}
-        {% if prop.price_unit == 'per_month' %}<span>/mo</span>{% elif prop.price_unit == 'per_sqft' %}<span>/sqft</span>{% endif %}
+        {% if prop.hide_price %}
+          <span class="price-on-request"><i class="fas fa-comment-dollar"></i> Price on Request</span>
+        {% else %}
+          {{ prop.price|price_compact(prop.currency) }}
+          {% if prop.price_unit == 'per_month' %}<span>/mo</span>{% elif prop.price_unit == 'per_sqft' %}<span>/sqft</span>{% endif %}
+        {% endif %}
       </div>
       <a href="{{ url_for('property_detail', slug=prop.slug) }}" class="prop-btn">View Details</a>
     </div>

@@ -133,6 +133,67 @@
             </select>
           </div>
         </div>
+
+        <div class="form-group" style="margin-top:.75rem">
+          <label class="checkbox-label">
+            <input type="checkbox" name="hide_price" value="1" {% if prop and prop.hide_price %}checked{% endif %}>
+            <span><i class="fas fa-eye-slash"></i> Hide price publicly — show <strong>"Price on Request"</strong> instead</span>
+          </label>
+          <small class="form-hint">The price you entered above is still saved for your records and visible to you here, but visitors will see "Price on Request" and can contact you for details.</small>
+        </div>
+      </div>
+
+      <!-- Builder / Developer Project -->
+      <div class="form-section">
+        <h4 class="form-section-title"><i class="fas fa-building"></i> Builder / Developer Project</h4>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" name="is_builder_project" value="1" id="isBuilderProjectCheck"
+                   {% if prop and prop.is_builder_project %}checked{% endif %}
+                   onchange="document.getElementById('builderProjectFields').style.display = this.checked ? 'block' : 'none'">
+            <span><i class="fas fa-city"></i> This is a Builder/Developer Project — show project &amp; builder details on the listing page</span>
+          </label>
+        </div>
+
+        <div id="builderProjectFields" style="display:{{ 'block' if (prop and prop.is_builder_project) else 'none' }};margin-top:1rem">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Builder / Developer Name</label>
+              <input type="text" name="builder_name" class="form-input" value="{{ prop.builder_name if prop else '' }}" placeholder="e.g. Skyline Developers Pvt. Ltd.">
+            </div>
+            <div class="form-group">
+              <label>RERA / DLD Registration Number</label>
+              <input type="text" name="builder_rera_number" class="form-input" value="{{ prop.builder_rera_number if prop else '' }}" placeholder="e.g. P52100012345">
+            </div>
+            <div class="form-group">
+              <label>Builder Contact Number</label>
+              <input type="text" name="builder_contact" class="form-input" value="{{ prop.builder_contact if prop else '' }}" placeholder="+91 98765 43210">
+            </div>
+            <div class="form-group">
+              <label>Builder Email</label>
+              <input type="email" name="builder_email" class="form-input" value="{{ prop.builder_email if prop else '' }}" placeholder="sales@builder.com">
+            </div>
+            <div class="form-group">
+              <label>Builder Website</label>
+              <input type="url" name="builder_website" class="form-input" value="{{ prop.builder_website if prop else '' }}" placeholder="https://www.builderwebsite.com">
+            </div>
+            <div class="form-group">
+              <label>Project Possession / Handover Date</label>
+              <input type="text" name="project_possession_date" class="form-input" value="{{ prop.project_possession_date if prop else '' }}" placeholder="e.g. Dec 2026 or Q4 2027">
+            </div>
+            <div class="form-group">
+              <label>Total Units in Project</label>
+              <input type="text" name="project_total_units" class="form-input" value="{{ prop.project_total_units if prop else '' }}" placeholder="e.g. 240">
+            </div>
+            <div class="form-group">
+              <label>Builder / Project Logo</label>
+              <input type="file" name="project_logo" accept="image/*" class="form-input">
+              {% if prop and prop.project_logo %}
+              <img src="{{ url_for('static', filename='uploads/profiles/' + prop.project_logo) }}" alt="Project Logo" class="form-image-preview">
+              {% endif %}
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Specifications -->

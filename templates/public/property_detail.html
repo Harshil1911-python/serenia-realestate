@@ -103,6 +103,41 @@
         </div>
         {% endif %}
 
+        <!-- Builder / Developer Project Info -->
+        {% if prop.is_builder_project %}
+        <div class="section-card builder-project-card">
+          <h3><i class="fas fa-city"></i> Project Information</h3>
+          <div class="builder-project-header">
+            {% if prop.project_logo %}
+            <img src="{{ url_for('static', filename='uploads/profiles/' + prop.project_logo) }}" alt="{{ prop.builder_name }}" class="builder-logo">
+            {% endif %}
+            <div>
+              {% if prop.builder_name %}<p class="builder-name">A Project by <strong>{{ prop.builder_name }}</strong></p>{% endif %}
+            </div>
+          </div>
+          <div class="builder-project-grid">
+            {% if prop.builder_rera_number %}
+            <div class="builder-info-item"><i class="fas fa-certificate"></i><div><span>RERA / DLD No.</span><strong>{{ prop.builder_rera_number }}</strong></div></div>
+            {% endif %}
+            {% if prop.project_possession_date %}
+            <div class="builder-info-item"><i class="fas fa-calendar-check"></i><div><span>Possession</span><strong>{{ prop.project_possession_date }}</strong></div></div>
+            {% endif %}
+            {% if prop.project_total_units %}
+            <div class="builder-info-item"><i class="fas fa-home"></i><div><span>Total Units</span><strong>{{ prop.project_total_units }}</strong></div></div>
+            {% endif %}
+            {% if prop.builder_contact %}
+            <div class="builder-info-item"><i class="fas fa-phone"></i><div><span>Builder Contact</span><strong><a href="tel:{{ prop.builder_contact }}">{{ prop.builder_contact }}</a></strong></div></div>
+            {% endif %}
+            {% if prop.builder_email %}
+            <div class="builder-info-item"><i class="fas fa-envelope"></i><div><span>Builder Email</span><strong><a href="mailto:{{ prop.builder_email }}">{{ prop.builder_email }}</a></strong></div></div>
+            {% endif %}
+            {% if prop.builder_website %}
+            <div class="builder-info-item"><i class="fas fa-globe"></i><div><span>Website</span><strong><a href="{{ prop.builder_website }}" target="_blank" rel="noopener">Visit Site</a></strong></div></div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
         <!-- Map (Leaflet) -->
         {% if prop.latitude and prop.longitude %}
         <div class="section-card">
@@ -152,7 +187,11 @@
           <div class="price-header">
             <div>
               <p class="price-amount">
-                {{ prop.price|price(prop.price_unit, prop.currency) }}
+                {% if prop.hide_price %}
+                  <span class="price-on-request"><i class="fas fa-comment-dollar"></i> Price on Request</span>
+                {% else %}
+                  {{ prop.price|price(prop.price_unit, prop.currency) }}
+                {% endif %}
               </p>
               <p class="price-unit">{{ prop.listing_type|title }} · {{ prop.property_type }}</p>
             </div>

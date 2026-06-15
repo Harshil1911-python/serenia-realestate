@@ -70,6 +70,7 @@ class Property(db.Model):
     price = db.Column(db.Float, nullable=False)
     price_unit = db.Column(db.String(20), default='total')  # total, per_sqft, per_month
     currency = db.Column(db.String(10), default='INR')  # INR, AED, USD, GBP, SAR, etc.
+    hide_price = db.Column(db.Boolean, default=False)  # if True, show "Price on Request" publicly
     area = db.Column(db.Float, nullable=True)
     area_unit = db.Column(db.String(10), default='sqft')
     bedrooms = db.Column(db.Integer, nullable=True)
@@ -93,6 +94,18 @@ class Property(db.Model):
     meta_title = db.Column(db.String(200), nullable=True)
     meta_description = db.Column(db.String(400), nullable=True)
     public_link_enabled = db.Column(db.Boolean, default=True)
+
+    # ── Builder / Developer Project fields ──
+    is_builder_project = db.Column(db.Boolean, default=False)
+    builder_name = db.Column(db.String(150), nullable=True)
+    builder_rera_number = db.Column(db.String(60), nullable=True)
+    builder_contact = db.Column(db.String(50), nullable=True)
+    builder_email = db.Column(db.String(120), nullable=True)
+    builder_website = db.Column(db.String(200), nullable=True)
+    project_possession_date = db.Column(db.String(60), nullable=True)
+    project_total_units = db.Column(db.String(50), nullable=True)
+    project_logo = db.Column(db.String(200), nullable=True)  # builder/developer logo image
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

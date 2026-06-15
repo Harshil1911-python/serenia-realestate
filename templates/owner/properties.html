@@ -29,11 +29,13 @@
               <div>
                 <strong>{{ prop.title[:35] }}</strong>
                 <small>{{ prop.property_id }}</small>
+                {% if prop.is_builder_project %}<span class="badge" style="background:#dbeafe;color:#1e40af;font-size:.65rem;display:inline-block;margin-top:.2rem"><i class="fas fa-city"></i> Builder Project</span>{% endif %}
               </div>
             </td>
             <td>{{ prop.property_type }}</td>
             <td>
               {{ prop.price|price_compact(prop.currency) }}
+              {% if prop.hide_price %}<span class="badge" style="background:#fef3c7;color:#92400e;font-size:.65rem;display:block;width:fit-content;margin-top:.2rem"><i class="fas fa-eye-slash"></i> Hidden</span>{% endif %}
             </td>
             <td>{{ prop.city or '—' }}</td>
             <td><span class="status-pill status-{{ prop.status }}">{{ prop.status|title }}</span></td>

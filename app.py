@@ -882,12 +882,14 @@ def properties():
         q = q.filter((Property.title.ilike(f'%{search}%'))|(Property.city.ilike(f'%{search}%'))|(Property.address.ilike(f'%{search}%')))
     status = request.args.get('status','')
     if status: q = q.filter(Property.status==status)
+    if request.args.get('builder') == '1':
+        q = q.filter(Property.is_builder_project==True)
     props = q.order_by(Property.created_at.desc()).paginate(page=page,per_page=12,error_out=False)
     cities = [c[0] for c in db.session.query(Property.city).distinct().filter(Property.city.isnot(None)).all() if c[0]]
     all_props_geo = q.filter(Property.latitude.isnot(None), Property.longitude.isnot(None)).limit(200).all()
     geo_data = [{'id':p.id,'title':p.title,'lat':p.latitude,'lng':p.longitude,
                  'price':p.price,'currency':p.currency or 'INR',
-                 'price_label': format_price_compact(p.price, p.currency),
+                 'price_label': ('Price on Request' if p.hide_price else format_price_compact(p.price, p.currency)),
                  'type':p.property_type,'status':p.status,
                  'img': (url_for('static',filename='uploads/properties/'+p.images[0].filename) if p.images else ''),
                  'url': url_for('property_detail',slug=p.slug)} for p in all_props_geo]
@@ -1240,6 +1242,7 @@ def add_property():
             price=float(request.form.get('price',0) or 0),
             price_unit=request.form.get('price_unit','total'),
             currency=request.form.get('currency','INR'),
+            hide_price='hide_price' in request.form,
             area=float(request.form.get('area',0) or 0),
             area_unit=request.form.get('area_unit','sqft'),
             bedrooms=int(request.form.get('bedrooms',0) or 0) or None,
@@ -1258,8 +1261,24 @@ def add_property():
             is_featured='is_featured' in request.form,
             meta_title=clean(request.form.get('meta_title','')),
             meta_description=clean(request.form.get('meta_description','')),
+            is_builder_project='is_builder_project' in request.form,
+            builder_name=clean(request.form.get('builder_name','')),
+            builder_rera_number=clean(request.form.get('builder_rera_number','')),
+            builder_contact=clean(request.form.get('builder_contact','')),
+            builder_email=clean(request.form.get('builder_email','')),
+            builder_website=clean(request.form.get('builder_website','')),
+            project_possession_date=clean(request.form.get('project_possession_date','')),
+            project_total_units=clean(request.form.get('project_total_units','')),
         )
         db.session.add(prop); db.session.flush()
+
+        # Builder/developer project logo upload
+        if 'is_builder_project' in request.form:
+            logo_file = request.files.get('project_logo')
+            if logo_file and logo_file.filename:
+                logo_fn = save_image(logo_file, 'profiles', (400, 400))
+                if logo_fn: prop.project_logo = logo_fn
+
         for a in request.form.getlist('amenities[]'):
             if a.strip(): db.session.add(PropertyAmenity(property_id=prop.id,name=a.strip()))
         brochure=request.files.get('brochure')
@@ -1358,6 +1377,7 @@ def edit_property(pid):
         prop.price=float(request.form.get('price',0) or 0)
         prop.price_unit=request.form.get('price_unit','total')
         prop.currency=request.form.get('currency','INR')
+        prop.hide_price='hide_price' in request.form
         prop.area=float(request.form.get('area',0) or 0)
         prop.area_unit=request.form.get('area_unit','sqft')
         prop.bedrooms=int(request.form.get('bedrooms',0) or 0) or None
@@ -1377,6 +1397,22 @@ def edit_property(pid):
         prop.meta_title=clean(request.form.get('meta_title',''))
         prop.meta_description=clean(request.form.get('meta_description',''))
         prop.updated_at=datetime.utcnow()
+
+        prop.is_builder_project='is_builder_project' in request.form
+        prop.builder_name=clean(request.form.get('builder_name',''))
+        prop.builder_rera_number=clean(request.form.get('builder_rera_number',''))
+        prop.builder_contact=clean(request.form.get('builder_contact',''))
+        prop.builder_email=clean(request.form.get('builder_email',''))
+        prop.builder_website=clean(request.form.get('builder_website',''))
+        prop.project_possession_date=clean(request.form.get('project_possession_date',''))
+        prop.project_total_units=clean(request.form.get('project_total_units',''))
+
+        if 'is_builder_project' in request.form:
+            logo_file = request.files.get('project_logo')
+            if logo_file and logo_file.filename:
+                logo_fn = save_image(logo_file, 'profiles', (400, 400))
+                if logo_fn: prop.project_logo = logo_fn
+
         PropertyAmenity.query.filter_by(property_id=prop.id).delete()
         for a in request.form.getlist('amenities[]'):
             if a.strip(): db.session.add(PropertyAmenity(property_id=prop.id,name=a.strip()))
@@ -1964,6 +2000,16 @@ def run_auto_migrations():
             'brochure_auto': 'BOOLEAN DEFAULT 0',
             'public_link_enabled': 'BOOLEAN DEFAULT 1',
             'currency': "VARCHAR(10) DEFAULT 'INR'",
+            'hide_price': 'BOOLEAN DEFAULT 0',
+            'is_builder_project': 'BOOLEAN DEFAULT 0',
+            'builder_name': 'VARCHAR(150)',
+            'builder_rera_number': 'VARCHAR(60)',
+            'builder_contact': 'VARCHAR(50)',
+            'builder_email': 'VARCHAR(120)',
+            'builder_website': 'VARCHAR(200)',
+            'project_possession_date': 'VARCHAR(60)',
+            'project_total_units': 'VARCHAR(50)',
+            'project_logo': 'VARCHAR(200)',
         },
         'users': {
             'totp_secret': 'VARCHAR(32)',

@@ -526,3 +526,64 @@ textarea.form-input { resize: vertical; min-height: 100px; }
 
 /* ── INQUIRY MORE STYLES ── */
 .inquiry-card h3 i { margin-right: .35rem; }
+
+/* ── PRICE ON REQUEST ── */
+.price-on-request {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+}
+.prop-price .price-on-request { font-size: .95rem; }
+
+/* ── BUILDER PROJECT TAG (card) ── */
+.builder-tag {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: #1e40af;
+  color: white;
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .3rem .65rem;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,.15);
+}
+.featured-tag ~ .builder-tag,
+.builder-tag ~ .featured-tag { top: 46px; }
+
+/* ── BUILDER PROJECT INFO CARD (detail page) ── */
+.builder-project-card { border: 1.5px solid #bfdbfe; background: #eff6ff; }
+.builder-project-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.builder-logo { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; border: 1px solid var(--border); background: white; }
+.builder-name { font-size: 1rem; color: var(--dark); }
+.builder-name strong { color: #1e40af; }
+.builder-project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 1rem; }
+.builder-info-item { display: flex; align-items: center; gap: .75rem; }
+.builder-info-item i { width: 36px; height: 36px; background: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #1e40af; flex-shrink: 0; }
+.builder-info-item span { display: block; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray); margin-bottom: .15rem; }
+.builder-info-item strong { font-size: .875rem; color: var(--dark); }
+.builder-info-item a { color: #1e40af; }
+
+/* ── INLINE CHECKBOX FILTER ── */
+.checkbox-label-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--dark);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.checkbox-label-inline input { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+.filter-checkbox { display: flex; align-items: center; }
+
+@media (max-width: 768px) {
+  .builder-project-grid { grid-template-columns: 1fr; }
+}
