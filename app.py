@@ -18,12 +18,14 @@ load_dotenv()
 
 from models import (db, User, Property, PropertyImage, PropertyVideo, PropertyAmenity,
                      Inquiry, Testimonial, BlogPost, ActivityLog, PageVisit, SiteSettings,
-                     FAQ, ExternalLink, Task, Note, PropertyNote)
+                     FAQ, ExternalLink, Task, Note, PropertyNote, PropertyFloorPlan)
+from translations import t as translate, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE
 
 app = Flask(__name__)
 
 # ── CONFIG ──────────────────────────────────────────────────────────
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'luxerealty-secret-key-change-in-prod-2025')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///realestate.db')
 if db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
@@ -192,6 +194,24 @@ def set_settings(data: dict):
         else: db.session.add(SiteSettings(key=key, value=val))
     db.session.commit()
 
+def get_lang():
+    """Return the active language code from session, falling back to default."""
+    lang = session.get('lang', DEFAULT_LANGUAGE)
+    if lang not in SUPPORTED_LANGUAGES:
+        lang = DEFAULT_LANGUAGE
+    return lang
+
+
+@app.route('/set-language/<lang>')
+def set_language(lang):
+    if lang not in SUPPORTED_LANGUAGES:
+        lang = DEFAULT_LANGUAGE
+    session['lang'] = lang
+    session.permanent = True
+    next_url = request.referrer or url_for('index')
+    return redirect(next_url)
+
+
 @app.context_processor
 def inject_globals():
     try:
@@ -206,13 +226,20 @@ def inject_globals():
             db.session.rollback()
             s = dict(SETTING_DEFAULTS)
             ext = []
+
+    lang = get_lang()
     return dict(
         settings=s, now=datetime.utcnow(),
         header_links=[l for l in ext if l.link_type=='header_nav'],
         footer_links=[l for l in ext if l.link_type=='footer'],
         social_links=[l for l in ext if l.link_type=='social'],
         csrf_token=generate_csrf,
+        t=lambda key: translate(key, lang),
+        current_lang=lang,
+        lang_dir=SUPPORTED_LANGUAGES.get(lang, {}).get('dir', 'ltr'),
+        supported_languages=SUPPORTED_LANGUAGES,
     )
+
 
 def track(page):
     try:
@@ -857,8 +884,8 @@ def index():
     s = get_settings()
     if s.get('maintenance_mode')=='true' and not (current_user.is_authenticated and current_user.is_developer()):
         return render_template('public/maintenance.html')
-    featured = Property.query.filter_by(is_featured=True).order_by(Property.created_at.desc()).limit(6).all()
-    latest = Property.query.order_by(Property.created_at.desc()).limit(8).all()
+    featured = _visible_query(Property.query.filter_by(is_featured=True)).order_by(Property.created_at.desc()).limit(6).all()
+    latest = _visible_query().order_by(Property.created_at.desc()).limit(8).all()
     testimonials = Testimonial.query.filter_by(is_active=True).order_by(Testimonial.created_at.desc()).limit(6).all()
     faqs = FAQ.query.filter_by(is_active=True).order_by(FAQ.sort_order).limit(6).all()
     return render_template('public/index.html', featured=featured, latest=latest,
@@ -869,7 +896,7 @@ def index():
 def properties():
     track('properties')
     page = request.args.get('page',1,type=int)
-    q = Property.query
+    q = _visible_query()
     for arg,col in [('type',Property.property_type),('listing',Property.listing_type),
                     ('city',Property.city),('furnishing',Property.furnishing)]:
         v = request.args.get(arg,'')
@@ -900,11 +927,68 @@ def properties():
 @app.route('/property/<slug>')
 def property_detail(slug):
     prop = Property.query.filter_by(slug=slug).first_or_404()
+
+    # Drafts and not-yet-published (scheduled) properties are only visible
+    # to logged-in owner/developer accounts (e.g. for preview).
+    now = datetime.utcnow()
+    is_hidden = (prop.status == 'draft') or (prop.publish_at and prop.publish_at > now)
+    if is_hidden and not current_user.is_authenticated:
+        abort(404)
+
     prop.views += 1; db.session.commit()
     track(f'property/{slug}')
-    similar = Property.query.filter(Property.property_type==prop.property_type,
-                                    Property.id!=prop.id,Property.status=='available').limit(4).all()
+    # "Similar properties": same type & city preferred, within +/-25% price
+    # range of this property, falling back to broader matches if too few.
+    price_lo, price_hi = prop.price * 0.75, prop.price * 1.25
+
+    similar_q = _visible_query(Property.query.filter(
+        Property.id != prop.id,
+        Property.status == 'available',
+        Property.property_type == prop.property_type,
+        Property.currency == prop.currency,
+        Property.price.between(price_lo, price_hi),
+    ))
+    if prop.city:
+        # Prefer same-city matches first, but don't exclude other cities
+        similar = similar_q.order_by(
+            (Property.city == prop.city).desc(),
+            db.func.abs(Property.price - prop.price)
+        ).limit(4).all()
+    else:
+        similar = similar_q.order_by(db.func.abs(Property.price - prop.price)).limit(4).all()
+
+    # Fallback: if not enough price-range matches, fill in with same-type listings
+    if len(similar) < 4:
+        existing_ids = {p.id for p in similar} | {prop.id}
+        extra_q = _visible_query(Property.query.filter(
+            Property.property_type == prop.property_type,
+            Property.status == 'available',
+            Property.id.notin_(existing_ids),
+        ))
+        extra = extra_q.order_by(db.func.abs(Property.price - prop.price)).limit(4 - len(similar)).all()
+        similar = similar + extra
+
     return render_template('public/property_detail.html', prop=prop, similar=similar)
+
+@app.route('/compare')
+def compare_properties():
+    track('compare')
+    ids_param = request.args.get('ids', '')
+    ids = []
+    for part in ids_param.split(','):
+        part = part.strip()
+        if part.isdigit():
+            ids.append(int(part))
+    ids = ids[:4]  # cap at 4 properties
+
+    props = []
+    if ids:
+        props = _visible_query(Property.query.filter(Property.id.in_(ids))).all()
+        # preserve the order the user added them in
+        order = {pid: i for i, pid in enumerate(ids)}
+        props.sort(key=lambda p: order.get(p.id, 999))
+
+    return render_template('public/compare.html', props=props)
 
 @app.route('/about')
 def about():
@@ -1269,6 +1353,7 @@ def add_property():
             builder_website=clean(request.form.get('builder_website','')),
             project_possession_date=clean(request.form.get('project_possession_date','')),
             project_total_units=clean(request.form.get('project_total_units','')),
+            publish_at=_parse_publish_at(),
         )
         db.session.add(prop); db.session.flush()
 
@@ -1297,6 +1382,7 @@ def add_property():
         _save_extracted_images(prop, has_existing_images=not first)
 
         _save_property_videos(prop)
+        _save_floor_plans(prop)
 
         db.session.commit()
 
@@ -1320,6 +1406,28 @@ def _unique_slug(base, model):
     slug=base; n=1
     while model.query.filter_by(slug=slug).first(): slug=f"{base}-{n}"; n+=1
     return slug
+
+def _visible_query(query=None):
+    """Apply the standard 'publicly visible' filter to a Property query:
+    excludes draft listings and anything scheduled for future publication."""
+    if query is None:
+        query = Property.query
+    now = datetime.utcnow()
+    return query.filter(
+        Property.status != 'draft',
+        db.or_(Property.publish_at.is_(None), Property.publish_at <= now)
+    )
+
+def _parse_publish_at():
+    """Parse the 'publish_at' datetime-local form field. Returns None if
+    empty/invalid (meaning: publish immediately, no scheduling)."""
+    raw = request.form.get('publish_at', '').strip()
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(raw, '%Y-%m-%dT%H:%M')
+    except ValueError:
+        return None
 
 def _save_extracted_images(prop, has_existing_images=False):
     """Attach images that were already extracted from a brochure PDF (and
@@ -1361,6 +1469,21 @@ def _save_property_videos(prop):
             if fn:
                 db.session.add(PropertyVideo(property_id=prop.id, video_type='upload',
                                               filename=fn, title='Property Video'))
+
+
+def _save_floor_plans(prop):
+    """Save uploaded floor plan images for a property."""
+    files = request.files.getlist('floor_plans[]')
+    titles = request.form.getlist('floor_plan_titles[]')
+    existing_count = len(prop.floor_plans)
+    for idx, fp in enumerate(files):
+        if fp and fp.filename:
+            fn = save_image(fp, 'properties', (1600, 1600))
+            if fn:
+                title = clean(titles[idx]) if idx < len(titles) and titles[idx].strip() else None
+                db.session.add(PropertyFloorPlan(
+                    property_id=prop.id, filename=fn, title=title,
+                    sort_order=existing_count + idx))
 
 @app.route('/owner/property/<int:pid>/edit', methods=['GET','POST'])
 @login_required
@@ -1406,6 +1529,7 @@ def edit_property(pid):
         prop.builder_website=clean(request.form.get('builder_website',''))
         prop.project_possession_date=clean(request.form.get('project_possession_date',''))
         prop.project_total_units=clean(request.form.get('project_total_units',''))
+        prop.publish_at=_parse_publish_at()
 
         if 'is_builder_project' in request.form:
             logo_file = request.files.get('project_logo')
@@ -1434,6 +1558,7 @@ def edit_property(pid):
                 prop.brochure_auto=False
 
         _save_property_videos(prop)
+        _save_floor_plans(prop)
 
         db.session.commit()
 
@@ -1482,6 +1607,16 @@ def delete_property_video(vid):
         try: os.remove(os.path.join(app.config['UPLOAD_FOLDER'],'videos',video.filename))
         except Exception: pass
     db.session.delete(video); db.session.commit()
+    return jsonify({'success':True})
+
+@app.route('/owner/property/floor-plan/<int:fid>/delete', methods=['POST'])
+@login_required
+@owner_required
+def delete_floor_plan(fid):
+    fp=PropertyFloorPlan.query.get_or_404(fid)
+    try: os.remove(os.path.join(app.config['UPLOAD_FOLDER'],'properties',fp.filename))
+    except Exception: pass
+    db.session.delete(fp); db.session.commit()
     return jsonify({'success':True})
 
 @app.route('/owner/property/<int:pid>/generate-brochure', methods=['POST'])
@@ -2010,6 +2145,7 @@ def run_auto_migrations():
             'project_possession_date': 'VARCHAR(60)',
             'project_total_units': 'VARCHAR(50)',
             'project_logo': 'VARCHAR(200)',
+            'publish_at': 'DATETIME',
         },
         'users': {
             'totp_secret': 'VARCHAR(32)',

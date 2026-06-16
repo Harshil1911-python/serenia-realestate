@@ -127,3 +127,97 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     }
   });
 });
+
+// ── PROPERTY COMPARISON ──
+const COMPARE_KEY = 'luxe_compare_ids';
+const COMPARE_MAX = 4;
+
+function getCompareList() {
+  try {
+    return JSON.parse(localStorage.getItem(COMPARE_KEY)) || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCompareList(list) {
+  localStorage.setItem(COMPARE_KEY, JSON.stringify(list));
+}
+
+function toggleCompare(checkbox) {
+  let list = getCompareList();
+  const id = checkbox.dataset.id;
+  const title = checkbox.dataset.title;
+
+  if (checkbox.checked) {
+    if (list.length >= COMPARE_MAX) {
+      checkbox.checked = false;
+      alert(`You can compare up to ${COMPARE_MAX} properties at a time. Remove one first.`);
+      return;
+    }
+    if (!list.find(item => item.id === id)) {
+      list.push({ id, title });
+    }
+  } else {
+    list = list.filter(item => item.id !== id);
+  }
+  saveCompareList(list);
+  renderCompareBar();
+}
+
+function clearCompare() {
+  saveCompareList([]);
+  document.querySelectorAll('.compare-checkbox').forEach(cb => cb.checked = false);
+  renderCompareBar();
+}
+
+function removeFromCompare(id) {
+  let list = getCompareList().filter(item => item.id !== id);
+  saveCompareList(list);
+  document.querySelectorAll(`.compare-checkbox[data-id="${id}"]`).forEach(cb => cb.checked = false);
+  renderCompareBar();
+}
+
+function renderCompareBar() {
+  const bar = document.getElementById('compareBar');
+  if (!bar) return;
+  const list = getCompareList();
+
+  document.getElementById('compareCount').textContent = list.length;
+
+  const itemsEl = document.getElementById('compareBarItems');
+  itemsEl.innerHTML = list.map(item =>
+    `<span class="compare-bar-chip">${item.title.length > 22 ? item.title.slice(0,22)+'…' : item.title}<button onclick="removeFromCompare('${item.id}')" aria-label="Remove">&times;</button></span>`
+  ).join('');
+
+  const btn = document.getElementById('compareBarBtn');
+  if (list.length >= 2) {
+    bar.classList.add('active');
+    btn.classList.remove('disabled');
+    btn.href = '/compare?ids=' + list.map(i => i.id).join(',');
+  } else if (list.length === 1) {
+    bar.classList.add('active');
+    btn.classList.add('disabled');
+    btn.removeAttribute('href');
+  } else {
+    bar.classList.remove('active');
+  }
+}
+
+// Restore checkbox state on page load + render bar
+document.addEventListener('DOMContentLoaded', () => {
+  const list = getCompareList();
+  const ids = new Set(list.map(i => i.id));
+  document.querySelectorAll('.compare-checkbox').forEach(cb => {
+    if (ids.has(cb.dataset.id)) cb.checked = true;
+  });
+  renderCompareBar();
+});
+
+// ── LANGUAGE DROPDOWN CLOSE ON OUTSIDE CLICK ──
+document.addEventListener('click', (e) => {
+  const dropdown = document.getElementById('langDropdown');
+  if (dropdown && !e.target.closest('.lang-switcher')) {
+    dropdown.classList.remove('open');
+  }
+});

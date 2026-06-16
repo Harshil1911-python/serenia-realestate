@@ -534,3 +534,10 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   .brochure-upload-row { flex-direction: column; align-items: stretch; }
   .brochure-upload-row input[type="file"] { max-width: 100% !important; }
 }
+
+/* ── FLOOR PLANS ── */
+.existing-floor-plans-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: .75rem; margin-bottom: .75rem; }
+.floor-plan-item { position: relative; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--gray-light); }
+.floor-plan-item img { width: 100%; height: 100px; object-fit: cover; display: block; }
+.floor-plan-title { display: block; font-size: .75rem; padding: .35rem .5rem; color: var(--gray); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.floor-plan-input-row { display: flex; gap: .5rem; margin-bottom: .5rem; align-items: center; }

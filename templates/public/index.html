@@ -12,26 +12,26 @@
     <div class="search-box" data-aos="fade-up" data-aos-delay="200">
       <form action="{{ url_for('properties') }}" method="GET" class="search-form">
         <div class="search-tabs">
-          <button type="button" class="search-tab active" data-listing="sale" onclick="setSearchTab(this,'sale')">Buy</button>
-          <button type="button" class="search-tab" data-listing="rent" onclick="setSearchTab(this,'rent')">Rent</button>
+          <button type="button" class="search-tab active" data-listing="sale" onclick="setSearchTab(this,'sale')">{{ t('search_buy') }}</button>
+          <button type="button" class="search-tab" data-listing="rent" onclick="setSearchTab(this,'rent')">{{ t('search_rent') }}</button>
         </div>
         <input type="hidden" name="listing" id="listingType" value="sale">
         <div class="search-inputs">
           <div class="search-field">
             <i class="fas fa-search"></i>
-            <input type="text" name="q" placeholder="Search city, locality, project...">
+            <input type="text" name="q" placeholder="{{ t('search_placeholder') }}">
           </div>
           <div class="search-field">
             <i class="fas fa-home"></i>
             <select name="type">
-              <option value="">Property Type</option>
+              <option value="">{{ t('search_property_type') }}</option>
               {% for pt in prop_types %}<option value="{{ pt }}">{{ pt }}</option>{% endfor %}
             </select>
           </div>
           <div class="search-field">
             <i class="fas fa-bed"></i>
             <select name="bedrooms">
-              <option value="">Bedrooms</option>
+              <option value="">{{ t('search_bedrooms') }}</option>
               <option value="1">1+</option><option value="2">2+</option><option value="3">3+</option><option value="4">4+</option>
             </select>
           </div>
@@ -73,8 +73,8 @@
 <section class="section featured-section">
   <div class="container">
     <div class="section-header has-link" data-aos="fade-up">
-      <div><span class="section-eyebrow">Hand-Picked</span><h2 class="section-title">Featured Properties</h2></div>
-      <a href="{{ url_for('properties') }}" class="section-link">View All <i class="fas fa-arrow-right"></i></a>
+      <div><span class="section-eyebrow">{{ t('hand_picked') }}</span><h2 class="section-title">{{ t('featured_properties') }}</h2></div>
+      <a href="{{ url_for('properties') }}" class="section-link"<>{{ t('view_all') }} <i class="fas fa-arrow-right"></i></a>
     </div>
     <div class="properties-grid">{% for prop in featured %}{% include "partials/property_card.html" %}{% endfor %}</div>
   </div>
@@ -86,8 +86,8 @@
 <section class="section latest-section" style="background:var(--gray-light)">
   <div class="container">
     <div class="section-header has-link" data-aos="fade-up">
-      <div><span class="section-eyebrow">New Listings</span><h2 class="section-title">Latest Properties</h2></div>
-      <a href="{{ url_for('properties') }}" class="section-link">View All <i class="fas fa-arrow-right"></i></a>
+      <div><span class="section-eyebrow">{{ t('new_listings') }}</span><h2 class="section-title">{{ t('latest_properties') }}</h2></div>
+      <a href="{{ url_for('properties') }}" class="section-link"<>{{ t('view_all') }} <i class="fas fa-arrow-right"></i></a>
     </div>
     <div class="properties-grid">{% for prop in latest %}{% include "partials/property_card.html" %}{% endfor %}</div>
   </div>

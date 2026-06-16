@@ -1,0 +1,124 @@
+{% extends "partials/base.html" %}
+{% block title %}{{ t('compare_properties') }} - {{ settings.site_name }}{% endblock %}
+
+{% block content %}
+<section class="page-hero page-hero-sm">
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="{{ url_for('index') }}">Home</a> /
+      <a href="{{ url_for('properties') }}">Properties</a> /
+      <span>Compare</span>
+    </div>
+    <h1 class="page-hero-title"><i class="fas fa-balance-scale"></i> Compare Properties</h1>
+  </div>
+</section>
+
+<section class="section compare-section">
+  <div class="container">
+    {% if props|length < 2 %}
+    <div class="empty-state">
+      <i class="fas fa-balance-scale"></i>
+      <h3>{{ t('not_enough_selected') }}</h3>
+      <p>{{ t('select_2_4_properties') }}</p>
+      <a href="{{ url_for('properties') }}" class="btn btn-primary" style="margin-top:1rem">{{ t('browse_properties') }}</a>
+    </div>
+    {% else %}
+    <div class="compare-table-wrap">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th class="compare-row-label"></th>
+            {% for prop in props %}
+            <th>
+              <div class="compare-col-header">
+                {% if prop.images %}
+                <img src="{{ url_for('static', filename='uploads/properties/' + prop.images[0].filename) }}" alt="{{ prop.title }}">
+                {% else %}
+                <div class="compare-img-placeholder"><i class="fas fa-home"></i></div>
+                {% endif %}
+                <h4>{{ prop.title[:45] }}</h4>
+                <a href="{{ url_for('property_detail', slug=prop.slug) }}" class="btn btn-primary btn-sm">{{ t('view_details') }}</a>
+              </div>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="compare-row-label">Price</td>
+            {% for prop in props %}
+            <td>
+              {% if prop.hide_price %}
+                <span class="price-on-request"><i class="fas fa-comment-dollar"></i> {{ t('price_on_request') }}</span>
+              {% else %}
+                <strong class="compare-price">{{ prop.price|price(prop.price_unit, prop.currency) }}</strong>
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          <tr>
+            <td class="compare-row-label">Type</td>
+            {% for prop in props %}<td>{{ prop.property_type }}</td>{% endfor %}
+          </tr>
+          <tr>
+            <td class="compare-row-label">Listing</td>
+            {% for prop in props %}<td>{{ prop.listing_type|title }}</td>{% endfor %}
+          </tr>
+          <tr>
+            <td class="compare-row-label">Status</td>
+            {% for prop in props %}<td><span class="status-pill status-{{ prop.status }}">{{ prop.status|replace('_',' ')|title }}</span></td>{% endfor %}
+          </tr>
+          <tr>
+            <td class="compare-row-label">Location</td>
+            {% for prop in props %}<td>{{ prop.city }}{% if prop.state %}, {{ prop.state }}{% endif %}</td>{% endfor %}
+          </tr>
+          <tr>
+            <td class="compare-row-label">Bedrooms</td>
+            {% for prop in props %}<td>{{ prop.bedrooms if prop.bedrooms is not none else '—' }}</td>{% endfor %}
+          </tr>
+          <tr>
+            <td class="compare-row-label">Bathrooms</td>
+            {% for prop in props %}<td>{{ prop.bathrooms if prop.bathrooms is not none else '—' }}</td>{% endfor %}
+          </tr>
+          <tr>
+            <td class="compare-row-label">Area</td>
+            {% for prop in props %}<td>{% if prop.area %}{{ prop.area|int }} {{ prop.area_unit }}{% else %}—{% endif %}</td>{% endfor %}
+          </tr>
+          <tr>
+            <td class="compare-row-label">Parking</td>
+            {% for prop in props %}<td>{{ prop.parking if prop.parking is not none else '—' }}</td>{% endfor %}
+          </tr>
+          <tr>
+            <td class="compare-row-label">Furnishing</td>
+            {% for prop in props %}<td>{{ prop.furnishing|title if prop.furnishing else '—' }}</td>{% endfor %}
+          </tr>
+          <tr>
+            <td class="compare-row-label">Property Age</td>
+            {% for prop in props %}<td>{{ prop.property_age if prop.property_age else '—' }}</td>{% endfor %}
+          </tr>
+          <tr>
+            <td class="compare-row-label">{{ t('builder_project') }}</td>
+            {% for prop in props %}
+            <td>{% if prop.is_builder_project %}<i class="fas fa-check-circle" style="color:#22c55e"></i> {{ prop.builder_name or 'Yes' }}{% else %}—{% endif %}</td>
+            {% endfor %}
+          </tr>
+          <tr>
+            <td class="compare-row-label">Amenities</td>
+            {% for prop in props %}
+            <td>
+              {% if prop.amenities %}
+                <div class="compare-amenities">
+                  {% for a in prop.amenities[:8] %}<span class="amenity-tag-sm">{{ a.name }}</span>{% endfor %}
+                  {% if prop.amenities|length > 8 %}<span class="amenity-tag-sm">+{{ prop.amenities|length - 8 }} more</span>{% endif %}
+                </div>
+              {% else %}—{% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

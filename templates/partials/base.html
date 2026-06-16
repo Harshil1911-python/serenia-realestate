@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ current_lang }}" dir="{{ lang_dir }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,7 +13,7 @@
   <link rel="icon" href="{{ url_for('static', filename='uploads/profiles/' + settings.favicon) }}">
   {% endif %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&family=Noto+Sans+Arabic:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
@@ -46,16 +46,28 @@
     </button>
 
     <ul class="nav-menu" id="navMenu">
-      <li><a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint=='index' %}active{% endif %}">Home</a></li>
-      <li><a href="{{ url_for('properties') }}" class="nav-link {% if request.endpoint=='properties' %}active{% endif %}">Properties</a></li>
-      <li><a href="{{ url_for('about') }}" class="nav-link {% if request.endpoint=='about' %}active{% endif %}">About</a></li>
-      <li><a href="{{ url_for('blog') }}" class="nav-link {% if request.endpoint in ['blog','blog_detail'] %}active{% endif %}">Blog</a></li>
-      <li><a href="{{ url_for('contact') }}" class="nav-link {% if request.endpoint=='contact' %}active{% endif %}">Contact</a></li>
+      <li><a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint=='index' %}active{% endif %}">{{ t('nav_home') }}</a></li>
+      <li><a href="{{ url_for('properties') }}" class="nav-link {% if request.endpoint=='properties' %}active{% endif %}">{{ t('nav_properties') }}</a></li>
+      <li><a href="{{ url_for('about') }}" class="nav-link {% if request.endpoint=='about' %}active{% endif %}">{{ t('nav_about') }}</a></li>
+      <li><a href="{{ url_for('blog') }}" class="nav-link {% if request.endpoint in ['blog','blog_detail'] %}active{% endif %}">{{ t('nav_blog') }}</a></li>
+      <li><a href="{{ url_for('contact') }}" class="nav-link {% if request.endpoint=='contact' %}active{% endif %}">{{ t('nav_contact') }}</a></li>
       {% for link in header_links %}
       <li><a href="{{ link.url }}" class="nav-link" target="{{ link.open_in }}">{{ link.name }}</a></li>
       {% endfor %}
+      <li class="nav-lang">
+        <div class="lang-switcher">
+          <button type="button" class="lang-switcher-btn" onclick="document.getElementById('langDropdown').classList.toggle('open')">
+            <i class="fas fa-globe"></i> {{ supported_languages[current_lang].native }} <i class="fas fa-chevron-down lang-caret"></i>
+          </button>
+          <div class="lang-dropdown" id="langDropdown">
+            {% for code, info in supported_languages.items() %}
+            <a href="{{ url_for('set_language', lang=code) }}" class="{% if code == current_lang %}active{% endif %}">{{ info.native }}</a>
+            {% endfor %}
+          </div>
+        </div>
+      </li>
       <li class="nav-cta">
-        <a href="tel:{{ settings.phone }}" class="btn-call"><i class="fas fa-phone"></i> Call Now</a>
+        <a href="tel:{{ settings.phone }}" class="btn-call"><i class="fas fa-phone"></i> {{ t('nav_call_now') }}</a>
       </li>
     </ul>
   </div>
@@ -102,17 +114,17 @@
           </div>
         </div>
         <div class="footer-col">
-          <h4>Quick Links</h4>
+          <h4>{{ t('quick_links') }}</h4>
           <ul>
-            <li><a href="{{ url_for('index') }}">Home</a></li>
-            <li><a href="{{ url_for('properties') }}">Properties</a></li>
-            <li><a href="{{ url_for('about') }}">About Us</a></li>
-            <li><a href="{{ url_for('blog') }}">Blog</a></li>
-            <li><a href="{{ url_for('contact') }}">Contact</a></li>
+            <li><a href="{{ url_for('index') }}">{{ t('nav_home') }}</a></li>
+            <li><a href="{{ url_for('properties') }}">{{ t('nav_properties') }}</a></li>
+            <li><a href="{{ url_for('about') }}">{{ t('nav_about') }}</a></li>
+            <li><a href="{{ url_for('blog') }}">{{ t('nav_blog') }}</a></li>
+            <li><a href="{{ url_for('contact') }}">{{ t('nav_contact') }}</a></li>
           </ul>
         </div>
         <div class="footer-col">
-          <h4>Property Types</h4>
+          <h4>{{ t('property_types') }}</h4>
           <ul>
             {% for pt in ['Apartment','Villa','Office','Shop','Land','Warehouse'] %}
             <li><a href="{{ url_for('properties') }}?type={{ pt }}">{{ pt }}</a></li>
@@ -123,14 +135,14 @@
           </ul>
         </div>
         <div class="footer-col">
-          <h4>Contact Us</h4>
+          <h4>{{ t('contact_us') }}</h4>
           <div class="contact-info">
             <p><i class="fas fa-map-marker-alt"></i> {{ settings.address }}</p>
             <p><i class="fas fa-phone"></i> <a href="tel:{{ settings.phone }}">{{ settings.phone }}</a></p>
             <p><i class="fas fa-envelope"></i> <a href="mailto:{{ settings.email }}">{{ settings.email }}</a></p>
           </div>
           <a href="https://wa.me/{{ settings.whatsapp }}" target="_blank" class="whatsapp-btn">
-            <i class="fab fa-whatsapp"></i> WhatsApp Us
+            <i class="fab fa-whatsapp"></i> {{ t('whatsapp_us') }}
           </a>
         </div>
       </div>
@@ -138,7 +150,7 @@
   </div>
   <div class="footer-bottom">
     <div class="container footer-bottom-inner">
-      <p>&copy; {{ now.year }} {{ settings.site_name }}. All Rights Reserved.</p>
+      <p>&copy; {{ now.year }} {{ settings.site_name }}. {{ t('all_rights_reserved') }}</p>
       <div class="footer-bottom-links">
         <a href="/{{ settings.admin_path or 'admin' }}/login" class="admin-link">Admin</a>
       </div>
@@ -154,6 +166,18 @@
   <a href="tel:{{ settings.phone }}" class="float-btn call-float" title="Call Now">
     <i class="fas fa-phone"></i>
   </a>
+</div>
+
+<!-- Property Comparison Bar -->
+<div id="compareBar" class="compare-bar">
+  <div class="compare-bar-inner">
+    <span class="compare-bar-label"><i class="fas fa-balance-scale"></i> Compare (<span id="compareCount">0</span>/4)</span>
+    <div id="compareBarItems" class="compare-bar-items"></div>
+    <div class="compare-bar-actions">
+      <a href="{{ url_for('compare_properties') }}" id="compareBarBtn" class="btn btn-primary btn-sm">Compare Now</a>
+      <button type="button" class="btn btn-outline btn-sm" onclick="clearCompare()">Clear</button>
+    </div>
+  </div>
 </div>
 
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>

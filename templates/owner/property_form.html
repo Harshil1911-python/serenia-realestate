@@ -70,11 +70,20 @@
           </div>
           <div class="form-group">
             <label>Status</label>
-            <select name="status" class="form-input">
-              {% for s in ['available','sold','rented','under_negotiation'] %}
-              <option value="{{ s }}" {% if prop and prop.status == s %}selected{% endif %}>{{ s|replace('_',' ')|title }}</option>
+            <select name="status" class="form-input" id="statusSelect" onchange="togglePublishDateHint()">
+              {% for s in ['draft','available','sold','rented','under_negotiation'] %}
+              <option value="{{ s }}" {% if (prop and prop.status == s) or (not prop and s == 'available') %}selected{% endif %}>{{ s|replace('_',' ')|title }}</option>
               {% endfor %}
             </select>
+            <small class="form-hint" id="draftHint" style="display:{{ 'block' if (prop and prop.status == 'draft') else 'none' }};color:#92400e">
+              <i class="fas fa-eye-slash"></i> Draft properties are hidden from the public site — only visible to you in the dashboard.
+            </small>
+          </div>
+          <div class="form-group">
+            <label>Schedule Publish Date <span class="form-hint" style="font-weight:400">(optional)</span></label>
+            <input type="datetime-local" name="publish_at" class="form-input"
+                   value="{{ prop.publish_at.strftime('%Y-%m-%dT%H:%M') if prop and prop.publish_at else '' }}">
+            <small class="form-hint">If set to a future date/time, this property won't appear publicly until then — even if status is "Available".</small>
           </div>
           {% if prop %}
           <div class="form-group">
@@ -348,6 +357,35 @@
         </div>
       </div>
 
+      <!-- Floor Plans -->
+      <div class="form-section">
+        <h4 class="form-section-title"><i class="fas fa-drafting-compass"></i> Floor Plans</h4>
+
+        {% if prop and prop.floor_plans %}
+        <div class="existing-floor-plans-grid" id="existingFloorPlans">
+          {% for fp in prop.floor_plans %}
+          <div class="floor-plan-item" data-fp-id="{{ fp.id }}">
+            <img src="{{ url_for('static', filename='uploads/properties/' + fp.filename) }}" alt="{{ fp.title or 'Floor Plan' }}">
+            <span class="floor-plan-title">{{ fp.title or 'Floor Plan' }}</span>
+            <button type="button" class="img-delete-btn" onclick="deleteFloorPlan({{ fp.id }}, this)"><i class="fas fa-times"></i></button>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="form-group" style="margin-top:.75rem">
+          <label>Add Floor Plan Images (with optional labels, e.g. "2BHK - Type A", "Ground Floor")</label>
+          <div id="floorPlanBuilder">
+            <div class="floor-plan-input-row">
+              <input type="file" name="floor_plans[]" accept="image/*" class="form-input">
+              <input type="text" name="floor_plan_titles[]" class="form-input" placeholder="Label (optional)" style="max-width:220px">
+              <button type="button" class="btn btn-xs btn-danger" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline btn-sm" onclick="addFloorPlanRow()" style="margin-top:.5rem"><i class="fas fa-plus"></i> Add Another Floor Plan</button>
+        </div>
+      </div>
+
       <!-- Brochure -->
       <div class="form-section">
         <h4 class="form-section-title"><i class="fas fa-file-pdf"></i> Brochure</h4>
@@ -372,9 +410,6 @@
             <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('regenForm').submit()">
               <i class="fas fa-sync"></i> Regenerate Brochure Now
             </button>
-            <form id="regenForm" method="POST" action="{{ url_for('generate_brochure', pid=prop.id) }}" style="display:none">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            </form>
             {% endif %}
           </div>
         </div>
@@ -446,6 +481,12 @@
         {% endif %}
       </div>
     </form>
+
+    {% if prop %}
+    <form id="regenForm" method="POST" action="{{ url_for('generate_brochure', pid=prop.id) }}" style="display:none">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    {% endif %}
 
     {% if prop %}
     <!-- Private Notes -->
@@ -725,7 +766,30 @@ async function deleteVideo(vidId, btn) {
   if (data.success) btn.closest('.video-item-row').remove();
 }
 
+// ── FLOOR PLANS ──
+function addFloorPlanRow() {
+  const row = document.createElement('div');
+  row.className = 'floor-plan-input-row';
+  row.innerHTML = `<input type="file" name="floor_plans[]" accept="image/*" class="form-input"><input type="text" name="floor_plan_titles[]" class="form-input" placeholder="Label (optional)" style="max-width:220px"><button type="button" class="btn btn-xs btn-danger" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;
+  document.getElementById('floorPlanBuilder').appendChild(row);
+}
+
+async function deleteFloorPlan(fpId, btn) {
+  if (!confirm('Delete this floor plan?')) return;
+  const res = await fetch(`/owner/property/floor-plan/${fpId}/delete`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': '{{ csrf_token() }}', 'Content-Type': 'application/json'}
+  });
+  const data = await res.json();
+  if (data.success) btn.closest('.floor-plan-item').remove();
+}
+
 // ── AMENITIES ──
+function togglePublishDateHint() {
+  const status = document.getElementById('statusSelect').value;
+  document.getElementById('draftHint').style.display = (status === 'draft') ? 'block' : 'none';
+}
+
 function addAmenity(value) {
   const row = document.createElement('div');
   row.className = 'amenity-input-row';

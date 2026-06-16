@@ -39,7 +39,7 @@
           {% endif %}
         </div>
 
-        <!-- Video Gallery -->
+        <!-- {{ t('video_gallery') }} -->
         {% if prop.videos or prop.video_url %}
         <div class="section-card">
           <h3><i class="fas fa-video"></i> Video Gallery</h3>
@@ -70,13 +70,13 @@
 
         <!-- Description -->
         <div class="section-card">
-          <h3>About This Property</h3>
+          <h3>{{ t('about_property') }}</h3>
           <div class="prop-description">{{ prop.description|safe if prop.description else 'No description available.' }}</div>
         </div>
 
         <!-- Specs -->
         <div class="section-card">
-          <h3>Property Details</h3>
+          <h3>{{ t('property_details') }}</h3>
           <div class="specs-grid">
             <div class="spec-item"><i class="fas fa-tag"></i><div><span>Property ID</span><strong>{{ prop.property_id }}</strong></div></div>
             <div class="spec-item"><i class="fas fa-home"></i><div><span>Type</span><strong>{{ prop.property_type }}</strong></div></div>
@@ -94,7 +94,7 @@
         <!-- Amenities -->
         {% if prop.amenities %}
         <div class="section-card">
-          <h3>Amenities & Features</h3>
+          <h3>{{ t('amenities_features') }}</h3>
           <div class="amenities-grid">
             {% for a in prop.amenities %}
             <span class="amenity-tag"><i class="fas fa-check-circle"></i> {{ a.name }}</span>
@@ -106,13 +106,13 @@
         <!-- Builder / Developer Project Info -->
         {% if prop.is_builder_project %}
         <div class="section-card builder-project-card">
-          <h3><i class="fas fa-city"></i> Project Information</h3>
+          <h3><i class="fas fa-city"></i> {{ t('project_information') }}</h3>
           <div class="builder-project-header">
             {% if prop.project_logo %}
             <img src="{{ url_for('static', filename='uploads/profiles/' + prop.project_logo) }}" alt="{{ prop.builder_name }}" class="builder-logo">
             {% endif %}
             <div>
-              {% if prop.builder_name %}<p class="builder-name">A Project by <strong>{{ prop.builder_name }}</strong></p>{% endif %}
+              {% if prop.builder_name %}<p class="builder-name">{{ t('a_project_by') }} <strong>{{ prop.builder_name }}</strong></p>{% endif %}
             </div>
           </div>
           <div class="builder-project-grid">
@@ -138,15 +138,39 @@
         </div>
         {% endif %}
 
+        <!-- {{ t('floor_plans') }} -->
+        {% if prop.floor_plans %}
+        <div class="section-card">
+          <h3><i class="fas fa-drafting-compass"></i> Floor Plans</h3>
+          <div class="floor-plans-gallery">
+            {% for fp in prop.floor_plans %}
+            <div class="floor-plan-card" onclick="openFloorPlanLightbox('{{ url_for('static', filename='uploads/properties/' + fp.filename) }}', '{{ (fp.title or 'Floor Plan')|e }}')">
+              <img src="{{ url_for('static', filename='uploads/properties/' + fp.filename) }}" alt="{{ fp.title or 'Floor Plan' }}" loading="lazy">
+              <span>{{ fp.title or 'Floor Plan' }} <i class="fas fa-expand"></i></span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Floor Plan Lightbox -->
+        <div id="floorPlanLightbox" class="floor-plan-lightbox" onclick="closeFloorPlanLightbox(event)">
+          <div class="floor-plan-lightbox-inner">
+            <button class="floor-plan-lightbox-close" onclick="closeFloorPlanLightbox(event)"><i class="fas fa-times"></i></button>
+            <img id="floorPlanLightboxImg" src="" alt="">
+            <p id="floorPlanLightboxTitle"></p>
+          </div>
+        </div>
+        {% endif %}
+
         <!-- Map (Leaflet) -->
         {% if prop.latitude and prop.longitude %}
         <div class="section-card">
           <h3><i class="fas fa-map-marked-alt"></i> Location on Map</h3>
           <div id="propDetailMap" style="height:380px;border-radius:12px;overflow:hidden;"></div>
           <div class="map-actions">
-            <a href="https://www.openstreetmap.org/directions?to={{ prop.latitude }}%2C{{ prop.longitude }}" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-directions"></i> Get Directions</a>
-            <a href="https://www.google.com/maps/search/?api=1&query={{ prop.latitude }},{{ prop.longitude }}" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-map-marker-alt"></i> Open in Google Maps</a>
-            <button type="button" class="btn btn-outline btn-sm" onclick="toggleNearby()"><i class="fas fa-store"></i> Show Nearby Places</button>
+            <a href="https://www.openstreetmap.org/directions?to={{ prop.latitude }}%2C{{ prop.longitude }}" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-directions"></i> {{ t('get_directions') }}</a>
+            <a href="https://www.google.com/maps/search/?api=1&query={{ prop.latitude }},{{ prop.longitude }}" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-map-marker-alt"></i> {{ t('open_in_google_maps') }}</a>
+            <button type="button" class="btn btn-outline btn-sm" onclick="toggleNearby()"><i class="fas fa-store"></i> {{ t('show_nearby_places') }}</button>
           </div>
         </div>
         {% elif prop.google_map_link %}
@@ -160,7 +184,7 @@
         <!-- Similar -->
         {% if similar %}
         <div class="section-card">
-          <h3>Similar Properties</h3>
+          <h3>{{ t('similar_properties') }}</h3>
           <div class="similar-grid">
             {% for sp in similar %}
             <a href="{{ url_for('property_detail', slug=sp.slug) }}" class="similar-card">
@@ -188,7 +212,7 @@
             <div>
               <p class="price-amount">
                 {% if prop.hide_price %}
-                  <span class="price-on-request"><i class="fas fa-comment-dollar"></i> Price on Request</span>
+                  <span class="price-on-request"><i class="fas fa-comment-dollar"></i> {{ t('price_on_request') }}</span>
                 {% else %}
                   {{ prop.price|price(prop.price_unit, prop.currency) }}
                 {% endif %}
@@ -202,10 +226,10 @@
             <span><i class="fas fa-eye"></i> {{ prop.views }} views</span>
           </div>
           <div class="contact-actions">
-            <a href="tel:{{ settings.phone }}" class="btn btn-primary btn-block"><i class="fas fa-phone"></i> Call Agent</a>
+            <a href="tel:{{ settings.phone }}" class="btn btn-primary btn-block"><i class="fas fa-phone"></i> {{ t('call_agent') }}</a>
             <a href="https://wa.me/{{ settings.whatsapp }}?text=Hi, I'm interested in {{ prop.title }} (ID: {{ prop.property_id }})" target="_blank" class="btn btn-whatsapp btn-block"><i class="fab fa-whatsapp"></i> WhatsApp</a>
             {% if prop.brochure_path %}
-            <a href="{{ url_for('static', filename='uploads/documents/' + prop.brochure_path) }}" download class="btn btn-outline btn-block"><i class="fas fa-file-pdf"></i> Download Brochure</a>
+            <a href="{{ url_for('static', filename='uploads/documents/' + prop.brochure_path) }}" download class="btn btn-outline btn-block"><i class="fas fa-file-pdf"></i> {{ t('download_brochure') }}</a>
             {% endif %}
           </div>
           <div class="share-section">
@@ -221,12 +245,12 @@
 
         <!-- Inquiry Form -->
         <div class="inquiry-card">
-          <h3><i class="fas fa-envelope" style="color:var(--primary)"></i> Send Inquiry</h3>
+          <h3><i class="fas fa-envelope" style="color:var(--primary)"></i> {{ t('send_inquiry') }}</h3>
           <form id="inquiryForm" onsubmit="submitInquiry(event, {{ prop.id }})">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="text" name="name" placeholder="Your Name *" required class="form-input">
-            <input type="email" name="email" placeholder="Email Address *" required class="form-input">
-            <input type="tel" name="phone" placeholder="Phone Number" class="form-input">
+            <input type="text" name="name" placeholder="{{ t('your_name') }} *" required class="form-input">
+            <input type="email" name="email" placeholder="{{ t('email_address') }} *" required class="form-input">
+            <input type="tel" name="phone" placeholder="{{ t('phone_number') }}" class="form-input">
             <textarea name="message" rows="3" required class="form-input" placeholder="I'm interested in this property...">I am interested in {{ prop.title }} (ID: {{ prop.property_id }}). Please contact me.</textarea>
             <button type="submit" class="btn btn-primary btn-block" id="inquirySubmitBtn">
               <i class="fas fa-paper-plane"></i> Send Inquiry
@@ -234,6 +258,52 @@
           </form>
           <div id="inquiryMsg" style="display:none;margin-top:.75rem;padding:.75rem;border-radius:8px;font-size:.875rem;font-weight:500;"></div>
         </div>
+
+        <!-- {{ t('emi_calculator') }} -->
+        {% if not prop.hide_price and prop.price_unit == 'total' %}
+        <div class="inquiry-card emi-calculator-card">
+          <h3><i class="fas fa-calculator" style="color:var(--primary)"></i> EMI / Mortgage Calculator</h3>
+
+          <div class="emi-field">
+            <label>{{ t('property_price') }}</label>
+            <div class="emi-readonly">{{ prop.price|price('total', prop.currency) }}</div>
+          </div>
+
+          <div class="emi-field">
+            <label>{{ t('down_payment') }}: <span id="emiDownPaymentLabel"></span></label>
+            <input type="range" id="emiDownPaymentPct" min="0" max="90" value="20" step="5" oninput="calculateEMI()">
+          </div>
+
+          <div class="emi-field">
+            <label>{{ t('loan_amount') }}</label>
+            <div class="emi-readonly" id="emiLoanAmount"></div>
+          </div>
+
+          <div class="emi-row">
+            <div class="emi-field">
+              <label>{{ t('interest_rate') }}</label>
+              <input type="number" id="emiInterestRate" class="form-input" value="8.5" min="0" max="25" step="0.1" oninput="calculateEMI()">
+            </div>
+            <div class="emi-field">
+              <label>{{ t('loan_tenure') }}</label>
+              <input type="number" id="emiTenure" class="form-input" value="20" min="1" max="35" step="1" oninput="calculateEMI()">
+            </div>
+          </div>
+
+          <div class="emi-result">
+            <span>{{ t('monthly_emi') }}</span>
+            <strong id="emiMonthlyAmount">—</strong>
+          </div>
+
+          <div class="emi-breakdown">
+            <div><span>{{ t('principal') }}</span><strong id="emiPrincipal">—</strong></div>
+            <div><span>{{ t('total_interest') }}</span><strong id="emiTotalInterest">—</strong></div>
+            <div><span>{{ t('total_payment') }}</span><strong id="emiTotalPayment">—</strong></div>
+          </div>
+
+          <small class="form-hint" style="margin-top:.625rem;display:block">This is an estimate for informational purposes only. Actual loan terms depend on your lender and eligibility.</small>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -250,6 +320,79 @@ function changeImg(thumb, src) {
   document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
   thumb.classList.add('active');
 }
+
+// Floor Plan Lightbox
+function openFloorPlanLightbox(src, title) {
+  document.getElementById('floorPlanLightboxImg').src = src;
+  document.getElementById('floorPlanLightboxTitle').textContent = title;
+  document.getElementById('floorPlanLightbox').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeFloorPlanLightbox(e) {
+  if (e) e.stopPropagation();
+  document.getElementById('floorPlanLightbox').classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+// EMI / Mortgage Calculator
+{% if not prop.hide_price and prop.price_unit == 'total' %}
+const EMI_PROPERTY_PRICE = {{ prop.price }};
+const EMI_CURRENCY = "{{ prop.currency or 'INR' }}";
+const EMI_CURRENCY_SYMBOLS = {'INR':'₹','AED':'AED','USD':'$','GBP':'£','EUR':'€','SAR':'SAR','QAR':'QAR'};
+const EMI_LAKH_CRORE = new Set(['INR']);
+
+function formatEmiAmount(amount) {
+  const symbol = EMI_CURRENCY_SYMBOLS[EMI_CURRENCY] || EMI_CURRENCY;
+  if (EMI_LAKH_CRORE.has(EMI_CURRENCY)) {
+    if (amount >= 10000000) return symbol + ' ' + (amount/10000000).toFixed(2) + ' Cr';
+    if (amount >= 100000) return symbol + ' ' + (amount/100000).toFixed(2) + ' Lakh';
+    return symbol + ' ' + amount.toLocaleString('en-IN', {maximumFractionDigits:0});
+  }
+  const prefix = ['$','£','€'].includes(symbol) ? symbol : symbol + ' ';
+  return prefix + amount.toLocaleString('en-US', {maximumFractionDigits:0});
+}
+
+function calculateEMI() {
+  const downPct = parseFloat(document.getElementById('emiDownPaymentPct').value) || 0;
+  const rate = parseFloat(document.getElementById('emiInterestRate').value) || 0;
+  const years = parseFloat(document.getElementById('emiTenure').value) || 1;
+
+  document.getElementById('emiDownPaymentLabel').textContent = downPct + '%';
+
+  const downPayment = EMI_PROPERTY_PRICE * (downPct / 100);
+  const loanAmount = EMI_PROPERTY_PRICE - downPayment;
+  document.getElementById('emiLoanAmount').textContent = formatEmiAmount(loanAmount);
+
+  const monthlyRate = (rate / 100) / 12;
+  const months = years * 12;
+
+  let emi;
+  if (monthlyRate === 0) {
+    emi = loanAmount / months;
+  } else {
+    const factor = Math.pow(1 + monthlyRate, months);
+    emi = loanAmount * monthlyRate * factor / (factor - 1);
+  }
+
+  if (!isFinite(emi) || loanAmount <= 0) {
+    document.getElementById('emiMonthlyAmount').textContent = formatEmiAmount(0);
+    document.getElementById('emiPrincipal').textContent = formatEmiAmount(loanAmount);
+    document.getElementById('emiTotalInterest').textContent = formatEmiAmount(0);
+    document.getElementById('emiTotalPayment').textContent = formatEmiAmount(loanAmount);
+    return;
+  }
+
+  const totalPayment = emi * months;
+  const totalInterest = totalPayment - loanAmount;
+
+  document.getElementById('emiMonthlyAmount').textContent = formatEmiAmount(emi) + ' / month';
+  document.getElementById('emiPrincipal').textContent = formatEmiAmount(loanAmount);
+  document.getElementById('emiTotalInterest').textContent = formatEmiAmount(totalInterest);
+  document.getElementById('emiTotalPayment').textContent = formatEmiAmount(totalPayment);
+}
+
+document.addEventListener('DOMContentLoaded', calculateEMI);
+{% endif %}
 
 // Inquiry
 async function submitInquiry(e, propId) {

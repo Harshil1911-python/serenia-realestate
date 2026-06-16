@@ -12,11 +12,18 @@
       <span class="badge badge-status-{{ prop.status }}">{{ prop.status|replace('_',' ')|title }}</span>
     </div>
     {% if prop.is_featured %}
-      <span class="featured-tag"><i class="fas fa-star"></i> Featured</span>
+      <span class="featured-tag"><i class="fas fa-star"></i> {{ t("featured") }}</span>
     {% endif %}
     {% if prop.is_builder_project %}
-      <span class="builder-tag"><i class="fas fa-city"></i> Builder Project</span>
+      <span class="builder-tag"><i class="fas fa-city"></i> {{ t('builder_project') }}</span>
     {% endif %}
+    <label class="compare-checkbox-wrap" title="Add to comparison" onclick="event.stopPropagation()">
+      <input type="checkbox" class="compare-checkbox"
+             data-id="{{ prop.id }}" data-title="{{ prop.title|e }}"
+             data-url="{{ url_for('property_detail', slug=prop.slug) }}"
+             onchange="toggleCompare(this)">
+      <span><i class="fas fa-balance-scale"></i> {{ t('compare') }}</span>
+    </label>
   </div>
   <div class="prop-body">
     <p class="prop-type">{{ prop.property_type }}</p>
@@ -31,13 +38,13 @@
     <div class="prop-footer">
       <div class="prop-price">
         {% if prop.hide_price %}
-          <span class="price-on-request"><i class="fas fa-comment-dollar"></i> Price on Request</span>
+          <span class="price-on-request"><i class="fas fa-comment-dollar"></i> {{ t('price_on_request') }}</span>
         {% else %}
           {{ prop.price|price_compact(prop.currency) }}
           {% if prop.price_unit == 'per_month' %}<span>/mo</span>{% elif prop.price_unit == 'per_sqft' %}<span>/sqft</span>{% endif %}
         {% endif %}
       </div>
-      <a href="{{ url_for('property_detail', slug=prop.slug) }}" class="prop-btn">View Details</a>
+      <a href="{{ url_for('property_detail', slug=prop.slug) }}" class="prop-btn">{{ t('view_details') }}</a>
     </div>
   </div>
 </div>
